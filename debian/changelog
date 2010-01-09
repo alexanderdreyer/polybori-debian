@@ -1,0 +1,44 @@
+polybori (0.5~rc1-2.1) unstable; urgency=low
+
+  * Non-maintainer upload. Thanks to Kumar Appaiah for the initial patch.
+  * debian/control:
+    - Add ‘XB-Python-Version: ${python:Version}’, as required by python-central.
+    - Tighten internal package dependencies.
+  * debian/*.install:
+    - Stop referring to particular versions of Python in debian/*.install
+      (closes: #557293).
+  * debian/rules:
+    - Use correct values for RELATIVEPYPREFIX variable.
+    - Pass name of Python-versioned Boost library to scons.
+  * debian/patches/link-with-versioned-boost.diff:
+    - Link to a correct version of Boost library.
+
+ -- Jakub Wilk <ubanus@users.sf.net>  Sat, 09 Jan 2010 21:53:54 +0100
+
+polybori (0.5~rc1-2) unstable; urgency=low
+
+  * Boost 1.39 has removed the "-mt" suffix, so revert the previous change
+    (and update the build dependency to 1.39) (Closes: #545608).
+
+ -- Tim Abbott <tabbott@mit.edu>  Fri, 18 Sep 2009 19:30:17 -0400
+
+polybori (0.5~rc1-1.1) unstable; urgency=low
+
+  * Non-maintainer upload.
+  * Fix FTBFS with current boost (Closes: #530478). As explained by Steve
+    M. Robbins, single- and multi-threaded variants got dropped, only mt
+    variants are available as of 1.37.0, suffixed with “-mt”. Since the
+    previous filenames aren't specified, make sure a “modern” version of
+    boost headers are used, bumping the versioned build dependency from
+    “>= 1.33” to “>= 1.37”, and tweak SConstruct to use “boost_python-mt”
+    instead of “boost_python” for the LIBS variable, using the following
+    patch:
+     - 01-fix-ftbfs-with-new-boost.diff
+
+ -- Cyril Brulebois <kibi@debian.org>  Thu, 02 Jul 2009 17:26:00 +0200
+
+polybori (0.5~rc1-1) unstable; urgency=low
+
+  * Initial release to Debian (Closes: #480077)
+
+ -- Tim Abbott <tabbott@mit.edu>  Tue, 08 Jul 2008 19:04:16 -0400

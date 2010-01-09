@@ -1,0 +1,27 @@
+Description: Link to a correct version of Boost library.
+Author: Jakub Wilk <ubanus@user.sf.net>
+Last-Update: 2010-01-09
+
+Index: polybori-0.5~rc1/SConstruct
+===================================================================
+--- polybori-0.5~rc1.orig/SConstruct	2010-01-09 23:00:23.000000000 +0100
++++ polybori-0.5~rc1/SConstruct	2010-01-09 23:06:17.000000000 +0100
+@@ -144,6 +144,8 @@
+                     'Build python extension, if possible', True))
+ opts.Add(BoolOption('BOOST_WORKS',
+                     'Skip check for Boost libraries', False))
++opts.Add('BOOST_LIBRARY',
++         'Name of Boost library to link with', 'boost_python')
+ 
+ opts.Add(BoolOption('RELATIVE_SYMLINK',
+                     'Use relative symbolic links on install', True))
+@@ -494,8 +496,7 @@
+         [TestsPath('src', t + ".cc"), libpb, gb]+ libCudd, 
+         CPPPATH=CPPPATH)
+ 
+-
+-LIBS = env['LIBS']+['boost_python']+USERLIBS
++LIBS = env['LIBS']+[env['BOOST_LIBRARY']]+USERLIBS
+ 
+ LIBS_static = ["polybori", 'groebner', cudd_name] + LIBS
+ #env["CPPDEFINES"].Append("Packed")
