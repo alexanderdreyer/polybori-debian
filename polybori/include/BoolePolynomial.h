@@ -28,7 +28,7 @@
 #include <algorithm>
 
 #include "BooleRing.h"
-  //#include "BoolePolyRing.h"
+#include "BoolePolyRing.h"
 // include basic definitions and decision diagram interface
 #include "CDDInterface.h"
 
@@ -119,12 +119,6 @@ public:
   /// Iterator-like type for navigating through diagram structure
   typedef dd_type::navigator navigator;
 
-  /// Type for output of pretty print
-  typedef dd_type::pretty_out_type pretty_out_type;
-
-  /// Type for naming file for pretty print
-  typedef dd_type::filename_type filename_type;
-
   /// @todo A more sophisticated treatment for monomials is needed.
 
   /// Fix type for treatment of monomials
@@ -140,7 +134,7 @@ public:
   typedef BooleConstant constant_type;
 
   /// Type for Boolean polynomial rings (without ordering)
-  typedef BooleRing ring_type;
+  typedef BoolePolyRing ring_type;
 
   /// Type for result of polynomial comparisons
   typedef CTypes::comp_type comp_type;
@@ -239,7 +233,7 @@ public:
 
   /// Construct polynomial from navigator
   BoolePolynomial(const navigator& rhs, const ring_type& ring):
-    m_dd(ring.core(), rhs)  {
+    m_dd(ring, rhs)  {
     assert(rhs.isValid());
   }
 
@@ -378,12 +372,6 @@ public:
   /// Print current polynomial to output stream
   ostream_type& print(ostream_type&) const;
 
-  /// Pretty print to stdout
-  void prettyPrint() const;
-
-  /// Pretty print to filename
-  void prettyPrint(filename_type filename) const;
-
   /// Start of iteration over monomials
   const_iterator begin() const;
 
@@ -487,7 +475,7 @@ public:
   bool_type isPair() const { return dd_is_pair(navigation()); }
 
   /// Access ring, where this belongs to
-  ring_type ring() const {  return ring_type(m_dd.manager()); } 
+  ring_type ring() const {  return ring_type(m_dd.ring()); } 
 
   /// Compare with right-hand side and return comparision code
   comp_type compare(const self&) const;
