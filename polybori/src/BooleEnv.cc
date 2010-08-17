@@ -35,15 +35,14 @@
 
 
 // load header file
-# include "BooleEnv.h"
-# include "BoolePolyRing.h"
+#include "BooleEnv.h"
+#include "BoolePolyRing.h"
+#include "COrderingBase.h"
 
 BEGIN_NAMESPACE_PBORI
 
 
-BooleEnv::ring_type active_ring;
-// Note, direct access via friends, to  active_ring.pOrder and pMgt, because
-// inline doesn't work up to now, because os the undefined type issue.
+BooleEnv::ring_type active_ring(10);
 
 /// @todo needs inlining!!!
 #ifdef PBORI_ENV_RING_NOTINLINED
@@ -76,14 +75,14 @@ void BooleEnv::clearBlocks() {
 
 BooleEnv::idx_type
 BooleEnv::lastBlockStart() {
-  return active_ring.lastBlockStart();
+  return active_ring.ordering().lastBlockStart();
 }
 
 
 
 
-BooleEnv::manager_type& BooleEnv::manager() {
-  return ring().manager(); }
+// BooleEnv::manager_type& BooleEnv::manager() {
+//   return ring().manager(); }
 BooleEnv::order_type& BooleEnv::ordering() { 
   return  ring().ordering(); }
 
@@ -98,7 +97,7 @@ BooleEnv::dd_type BooleEnv::one() { return ring().one(); }
 
   /// Get number of ring variables the of active ring
 BooleEnv::size_type BooleEnv::nVariables() { 
-  return manager().nVariables(); 
+  return ring().nVariables(); 
 }
 
 
@@ -148,13 +147,13 @@ BooleEnv::printInfo() {
 
   /// Access idx-th variable of the active ring
 BooleEnv::dd_type BooleEnv::variable(idx_type idx) { 
-  return manager().variable(idx); 
+  return ring().variable(idx); 
 } 
 
 
   /// Access idx-th variable
 BooleEnv::dd_type BooleEnv::persistentVariable(idx_type idx) {
-    return manager().persistentVariable(idx); 
+    return ring().persistentVariable(idx); 
   }
 
 

@@ -11,25 +11,6 @@
  * @par Copyright:
  *   (c) 2008 by The PolyBoRi Team
  *
- * @internal 
- * @version \$Id$
- *
- * @par History:
- * @verbatim
- * $Log$
- * Revision 1.4  2009/07/23 19:41:06  dreyer
- * ADD: BooleRing::hash
- *
- * Revision 1.3  2009/06/22 07:58:42  dreyer
- * ADD: cloning of rings
- *
- * Revision 1.2  2008/03/03 18:07:19  dreyer
- * Fix: missing things in Python-interface
- *
- * Revision 1.1  2008/03/02 23:45:34  dreyer
- * CHANGED: added contructors for given ring
- *
- * @endverbatim
 **/
 //*****************************************************************************
 
@@ -37,8 +18,10 @@
 # include "pbori_defs.h"
 
 // include basic decision diagram manager interface 
-#include "CDDManager.h"
-
+  //#include "CDDManager.h"
+#include "CCuddCore.h"
+#include "PBoRiError.h"
+#include <boost/intrusive_ptr.hpp>
 
 #ifndef BooleRing_h_
 #define BooleRing_h_
@@ -50,6 +33,9 @@ BEGIN_NAMESPACE_PBORI
  * managers as Boolean polynomial rings.
  *
  **/
+template <class DiagramType, class RingType>
+class CCuddDDBase;
+
 class BooleRing: 
   public CTypes::orderenums_type, public CTypes::compenums_type, 
   public CTypes::auxtypes_type {
@@ -62,116 +48,103 @@ class BooleRing:
   /// generic access to current type
   typedef BooleRing self;
 
-  /// generic access to base type
-  typedef CTypes::orderenums_type base;
-
   /// @name adopt global type definitions
   //@{
   typedef CTypes::ordercode_type ordercode_type;
-  typedef CTypes::manager_type manager_type;
-  typedef CTypes::manager_reference manager_reference;
-  typedef CTypes::manager_ptr manager_ptr;
+  typedef CTypes::dd_base dd_base;
   typedef CTypes::dd_type dd_type;
   typedef CTypes::vartext_type vartext_type;
   //@}
+
+  /// Type of actual data
+  typedef CCuddCore core_type;
+  typedef core_type::const_varname_reference const_varname_reference;
+  /// Smart pointer to core
+  typedef boost::intrusive_ptr<core_type> core_ptr;
+
   /// Type for handling mterm orderings
-  typedef manager_type::order_type order_type;
+  typedef core_type::order_type order_type;
 
   /// Smart pointer for handling mterm orderings
-  typedef manager_type::order_ptr order_ptr;
+  typedef core_type::order_ptr order_ptr;
 
   /// Reference for handling mterm orderings
   typedef order_type& order_reference;
 
   /// Explicitely mention ordercodes' enumeration
-  using base::ordercodes;
+  using CTypes::orderenums_type::ordercodes;
 
-   /// Constructor
-  BooleRing();
+protected:
+
+  template <class, class> class CCuddDDBase;
+  /// Support for shallow copy (clone)
+  /// @note May generate invalid ring, hence @c protected 
+  BooleRing(const core_ptr& rhs):  p_core(rhs) {}
+
+public:
+   /// Constructor for @em nvars variables (and lp ordering)
   BooleRing(size_type nvars);
-   /// Constructor for @em nvars variables
+
+  /// Constructor for @em nvars variables (and given pointer to ordering)
   BooleRing(size_type nvars,
             const order_ptr& order):
-    m_mgr(nvars, order) {}
+    p_core(new core_type(nvars, order)) {}
 
-  BooleRing(const manager_type& mgr):
-    m_mgr(mgr) {}
+  /// Copy constructor (cheap)
+  BooleRing(const self& rhs):  p_core(rhs.p_core) {}
 
-  /// destructor
+  /// Destructor
   ~BooleRing() {}
 
-  /// Access to decision diagram manager
-  manager_type& manager() {  return m_mgr; }
-
-  /// Constant access to decision diagram manager
-  const manager_type& manager() const {  return m_mgr; }
-
-  /// Access nvar-th variable of decision diagram manager
-  dd_type ddVariable(idx_type nvar) const { return m_mgr.ddVariable(nvar); }
-
-  /// Access nvar-th ring variable
-  dd_type variable(idx_type nvar) const { return m_mgr.variable(nvar); }
-
-  /// Access nvar-th ring variable
-  dd_type persistentVariable(idx_type nvar) const { 
-    return m_mgr.persistentVariable(nvar); 
-  }
-
-  /// Get empty decision diagram 
-  dd_type zero() const { return m_mgr.empty(); }
-
-  /// Get decision diagram with all variables negated
-  dd_type one() const { return m_mgr.blank(); }
-
-
-  /// Get constant one or zero
-  dd_type constant(bool is_one) const { return (is_one? one(): zero()); }
 
   /// Get number of ring variables
-  size_type nVariables() const { return m_mgr.nVariables(); }
+  size_type nVariables() const { return p_core->m_mgr.nVariables(); }
 
   /// Get name of variable with index idx
-  vartext_type getVariableName(idx_type idx){
-    return m_mgr.getVariableName(idx);
+  vartext_type getVariableName(idx_type idx) const {
+    return p_core->m_names[idx];
+  }
+  /// Get name of variable with index idx
+  vartext_type getName(idx_type idx) const{
+    return getVariableName(idx);
   }
 
   /// Set name of variable with index idx
   void setVariableName(idx_type idx, vartext_type varname) {
-    m_mgr.setVariableName(idx, varname);
+    p_core->m_names.set(idx, varname);
   }
 
   /// Clears the function cache
-  void clearCache() { cuddCacheFlush(m_mgr.manager().getManager()); }
+  void clearCache() { p_core->m_mgr.cacheFlush(); }
 
   /// Print out statistics and settings for current ring
-  void printInfo() {  return m_mgr.printInfo(); }
+  void printInfo() {  return p_core->m_mgr.info(); }
 
-  /// Generate ring based on the same manager
-  self clone() const {
-
-    return self( (manager_type)CCuddCore::mgrcore_ptr(new
-       CCuddCore(*m_mgr.manager().managerCore())));
-  }
-
-  /// Get unique identifier for *this
+  /// Get unique identifier for manager of *this
   hash_type hash() const { 
     return static_cast<hash_type>(reinterpret_cast<std::ptrdiff_t
-                                  >(m_mgr.manager().getManager())); 
+                                  >(getManager())); 
   }
 
   /// Access ordering of *this
   order_reference ordering() const { 
+    return *(p_core->pOrder); 
+  }
 
-    //    assert(getOrderCode() == globalOrderCode() );
+  /// Get plain decision diagram manager
+  DdManager* getManager() const {
+    return p_core->m_mgr.getManager();
+  }
 
-    return *(m_mgr.manager().managerCore()->pOrder); }
-  /// Access ordering of *this
-  order_ptr pOrdering() const { return m_mgr.manager().managerCore()->pOrder; }
-protected: 
-  /// Interprete @c m_mgr as structure of Boolean polynomial ring
-  ordercode_type getOrderCode() const;
-  static ordercode_type globalOrderCode();
-  manager_type m_mgr;
+  /// Deep copy of @c *this
+  self clone() const {  return self(new core_type(*p_core)); }
+protected:
+
+  /// Access to actual data (via ->)
+  core_ptr core() const {return p_core;};
+
+  /// Smart pointer to actual data
+  core_ptr p_core;
 };
 
 

@@ -517,7 +517,7 @@ BoolePolynomial::operator*=(const monom_type& rhs) {
     cache_mgr_type;
 
   self result = 
-    dd_multiply_recursively_monom(cache_mgr_type(diagram().manager()), 
+    dd_multiply_recursively_monom(cache_mgr_type(ring()), 
                                   rhs.diagram().navigation(),
                                   navigation(),  self());
 
@@ -529,9 +529,9 @@ BoolePolynomial&
 BoolePolynomial::operator*=(const exp_type& rhs) {
 
   PBORI_TRACE_FUNC( "BoolePolynomial::operator*=(const exp_type&)" );
-  typedef CCacheManagement<CCacheTypes::no_cache> cache_mgr_type;
+  typedef CCacheManagement<ring_type, CCacheTypes::no_cache> cache_mgr_type;
 
-  self result = dd_multiply_recursively_exp(cache_mgr_type(diagram().manager()),
+  self result = dd_multiply_recursively_exp(cache_mgr_type(ring()),
                                             rhs.begin(), rhs.end(),
                                             navigation(), self() );
 
@@ -550,7 +550,7 @@ BoolePolynomial::operator*=(const self& rhs) {
   typedef CommutativeCacheManager<CCacheTypes::multiply_recursive>
     cache_mgr_type;
 
-  self result = dd_multiply_recursively(cache_mgr_type(diagram().manager()), 
+  self result = dd_multiply_recursively(cache_mgr_type(ring()), 
                                         navigation(), rhs.navigation(),
                                         self()); 
 
@@ -566,10 +566,10 @@ BoolePolynomial::operator/=(const monom_type& rhs) {
 
 
 
-  typedef CCacheManagement<CCacheTypes::divide>
+  typedef CCacheManagement<ring_type, CCacheTypes::divide>
     cache_mgr_type;
 
-  self result = dd_divide_recursively(cache_mgr_type(diagram().manager()), 
+  self result = dd_divide_recursively(cache_mgr_type(ring()), 
                                       navigation(),
                                       rhs.diagram().navigation(),
                                       self());
@@ -583,10 +583,10 @@ BoolePolynomial&
 BoolePolynomial::operator/=(const exp_type& rhs) {
 
   PBORI_TRACE_FUNC( "BoolePolynomial::operator/=(const exp_type&)" );
-  typedef CCacheManagement<CCacheTypes::no_cache> cache_mgr_type;
+  typedef CCacheManagement<ring_type, CCacheTypes::no_cache> cache_mgr_type;
 
   return (*this = 
-          dd_divide_recursively_exp(cache_mgr_type(diagram().manager()), 
+          dd_divide_recursively_exp(cache_mgr_type(ring()), 
                                     navigation(), rhs.begin(),rhs.end(),
                                     self()));
 }
@@ -735,7 +735,7 @@ BoolePolynomial::deg() const {
   /// more efficient search may be needed.
 
 #ifndef PBORI_NO_DEGCACHE
-  return dd_cached_degree(CDegreeCache<>(m_dd.manager()), navigation());
+  return dd_cached_degree(CDegreeCache<>(ring()), navigation());
 #else
   return ( isConstant() ? 
            (deg_type) 0 :
@@ -796,7 +796,7 @@ BoolePolynomial::gradedPart(deg_type deg) const {
 
   PBORI_TRACE_FUNC( "BoolePolynomial::gradedPart(deg_type) const" );
   typedef CDegreeArgumentCache<CCacheTypes::graded_part> cache_type;
-  return dd_graded_part(cache_type(m_dd.manager()), 
+  return dd_graded_part(cache_type(ring()), 
                         navigation(), deg, set_type());
 }
 
@@ -871,28 +871,11 @@ BoolePolynomial::print(ostream_type& os) const {
     os << 1;
   else
     dd_print_terms(orderedExpBegin(), orderedExpEnd(), 
-                   variable_name<CTypes::manager_base>(m_dd.managerCore()), 
+                   variable_name<ring_type>(ring()), 
                    sep_literal_type(), times_as_separator(), 
                    integral_constant<unsigned, 1>(), os);
 
   return os;
-}
-
-/// Pretty print to stdout
-void BoolePolynomial::prettyPrint() const {
-
-  PBORI_TRACE_FUNC( "BoolePolynomial::prettyPrint() const" );
-  m_dd.prettyPrint();
-}
-
-/// Pretty print to filename
-void BoolePolynomial::prettyPrint(filename_type filename) const {
-
-  PBORI_TRACE_FUNC( "BoolePolynomial::prettyPrint(filename_type) const" );
-  bool_type error = m_dd.prettyPrint(filename);
-
-  if (error)
-    throw PBoRiError(CTypes::io_error);
 }
 
 
@@ -926,7 +909,7 @@ BoolePolynomial::deg_iterator
 BoolePolynomial::degBegin() const {
 
   PBORI_TRACE_FUNC( "BoolePolynomial::degBegin() const" );
-  return deg_iterator(navigation(), m_dd.managerCore());
+  return deg_iterator(navigation(), ring());
 }
 
 // Finish of leading term 
@@ -974,7 +957,7 @@ BoolePolynomial::const_iterator
 BoolePolynomial::begin() const {
 
   PBORI_TRACE_FUNC( "BoolePolynomial::begin() const" );
-  return const_iterator(navigation(), m_dd.managerCore() );
+  return const_iterator(navigation(), ring() );
 }
 
 // Finish of iteration over monomials
@@ -1007,7 +990,7 @@ BoolePolynomial::lex_iterator
 BoolePolynomial::genericBegin(lex_tag) const {
 
   PBORI_TRACE_FUNC( "BoolePolynomial::genericBegin(lex_tag) const" );
-  return lex_iterator(navigation(), m_dd.managerCore());
+  return lex_iterator(navigation(), ring());
 }
 
 // Finish of iteration over monomials in lex ordering
@@ -1023,7 +1006,7 @@ BoolePolynomial::dlex_iterator
 BoolePolynomial::genericBegin(dlex_tag) const {
 
   PBORI_TRACE_FUNC( "BoolePolynomial::genericBegin(dlex_tag) const" );
-  return dlex_iterator(navigation(), m_dd.managerCore());
+  return dlex_iterator(navigation(), ring());
 }
 
 // Finish of iteration over monomials in deg-lex ordering
@@ -1039,7 +1022,7 @@ BoolePolynomial::dp_asc_iterator
 BoolePolynomial::genericBegin(dp_asc_tag) const {
 
   PBORI_TRACE_FUNC( "BoolePolynomial::genericBegin(sd_asc_tag) const" );
-  return dp_asc_iterator(navigation(), m_dd.managerCore());
+  return dp_asc_iterator(navigation(), ring());
 }
 
 // Finish of iteration over monomials in ascending deg-rev-lex ordering
@@ -1054,7 +1037,7 @@ BoolePolynomial::block_dlex_iterator
 BoolePolynomial::genericBegin(block_dlex_tag) const {
 
   PBORI_TRACE_FUNC( "BoolePolynomial::genericBegin(block_dlex_tag) const" );
-  return block_dlex_iterator(navigation(), m_dd.managerCore());
+  return block_dlex_iterator(navigation(), ring());
 }
 
 // Finish of iteration over monomials in block deg-lex ordering
@@ -1068,7 +1051,7 @@ BoolePolynomial::block_dp_asc_iterator
 BoolePolynomial::genericBegin(block_dp_asc_tag) const {
 
   PBORI_TRACE_FUNC( "BoolePolynomial::genericBegin(block_dp_asc_tag) const" );
-  return block_dp_asc_iterator(navigation(), m_dd.managerCore());
+  return block_dp_asc_iterator(navigation(), ring());
 }
 
 BoolePolynomial::block_dp_asc_iterator
@@ -1083,7 +1066,7 @@ BoolePolynomial::lex_exp_iterator
 BoolePolynomial::genericExpBegin(lex_tag) const {
 
   PBORI_TRACE_FUNC( "BoolePolynomial::genericExpBegin(lex_tag) const" );
-  return lex_exp_iterator(navigation(), m_dd.managerCore());
+  return lex_exp_iterator(navigation(), ring());
 }
 
 // Finish of iteration over monomials in lex ordering
@@ -1099,7 +1082,7 @@ BoolePolynomial::dlex_exp_iterator
 BoolePolynomial::genericExpBegin(dlex_tag) const {
 
   PBORI_TRACE_FUNC( "BoolePolynomial::genericExpBegin(dlex_tag) const" );
-  return dlex_exp_iterator(navigation(), m_dd.managerCore());
+  return dlex_exp_iterator(navigation(), ring());
 }
 
 // Finish of iteration over monomials in deg-lex ordering
@@ -1115,7 +1098,7 @@ BoolePolynomial::dp_asc_exp_iterator
 BoolePolynomial::genericExpBegin(dp_asc_tag) const {
 
   PBORI_TRACE_FUNC( "BoolePolynomial::genericExpBegin(sd_asc_tag) const" );
-  return dp_asc_exp_iterator(navigation(), m_dd.managerCore());
+  return dp_asc_exp_iterator(navigation(), ring());
 }
 
 // Finish of iteration over monomials in ascending deg-rev-lex ordering
@@ -1131,7 +1114,7 @@ BoolePolynomial::block_dlex_exp_iterator
 BoolePolynomial::genericExpBegin(block_dlex_tag) const {
 
   PBORI_TRACE_FUNC( "BoolePolynomial::genericExpBegin(block_dlex_tag) const" );
-  return block_dlex_exp_iterator(navigation(), m_dd.managerCore());
+  return block_dlex_exp_iterator(navigation(), ring());
 }
 
 // Finish of iteration over monomials in block deg-lex ordering
@@ -1146,7 +1129,7 @@ BoolePolynomial::block_dp_asc_exp_iterator
 BoolePolynomial::genericExpBegin(block_dp_asc_tag) const {
 
   PBORI_TRACE_FUNC( "BoolePolynomial::genericExpBegin(block_dp_asc_tag) const" );
-  return block_dp_asc_exp_iterator(navigation(), m_dd.managerCore());
+  return block_dp_asc_exp_iterator(navigation(), ring());
 }
 
 // Finish of iteration over monomials in block deg-lex ordering

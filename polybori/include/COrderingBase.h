@@ -1,6 +1,6 @@
 // -*- c++ -*-
 //*****************************************************************************
-/** @file CDynamicOrderBase.h
+/** @file COrderingBase.h
  *
  * @author Alexander Dreyer
  * @date 2006-05-23
@@ -19,56 +19,38 @@
 #include "BoolePolynomial.h"
 #include "BooleMonomial.h"
 #include "BooleExponent.h"
-
+#include "COrderedIter.h"
 #include <vector>
-
-#ifndef CDynamicOrderBase_h_
-#define CDynamicOrderBase_h_
-
+#ifndef COrderingBase_h_
+#define COrderingBase_h_
 
 BEGIN_NAMESPACE_PBORI
+class BoolePolynomial;
+class BooleMonomial;
+class BooleExponent;
+class CCuddNavigator;
 
-/** @class CDynamicOrderBase
+/** @class COrderingBase
  * This class is the base of all PolyBoRi orderings.
  *
  * It can be used as an abstract base for runtime-selectable orderings.
  **/
-class CDynamicOrderBase:
+class COrderingBase:
   public CTypes::auxtypes_type { 
->>>>>>> other
-
-public:
 
   /// Type of *this
-  typedef CDynamicOrderBase self;
+  typedef COrderingBase self;
 
-  /// @name adopt global type definitions
+public:
+  /// @name Adopt polynomial type definitions
   //@{
-  typedef CTypes::bool_type bool_type;
-  typedef CTypes::size_type size_type;
-  typedef CTypes::idx_type idx_type;
-  typedef CTypes::comp_type comp_type;
-  typedef CTypes::ordercode_type ordercode_type;
   typedef BoolePolynomial poly_type;
-  typedef poly_type::monom_type monom_type;
-  typedef poly_type::navigator navigator;
-  typedef poly_type::exp_type exp_type;
+  typedef BooleMonomial monom_type;
+  typedef CCuddNavigator navigator;
+  typedef BooleExponent exp_type;
 
   typedef COrderedIter<navigator, monom_type> ordered_iterator;
   typedef COrderedIter<navigator, exp_type> ordered_exp_iterator;
-  //@}
-
-  /// @name define generic property markers (default is invalid)
-  //@{
-  typedef invalid_tag lex_property; 
-  typedef invalid_tag ordered_property;
-  typedef invalid_tag symmetry_property;
-  typedef invalid_tag degorder_property;
-  typedef invalid_tag blockorder_property;
-  typedef invalid_tag degrevlexorder_property; 
-  typedef invalid_tag totaldegorder_property;
-  typedef invalid_tag ascending_property;
-  typedef invalid_tag descending_property;
   //@}
 
   /// Type for block indices
@@ -80,11 +62,11 @@ public:
   /// Type of Boolean sets
   typedef BooleSet set_type;
 
-  /// Construct new
-  CDynamicOrderBase() { }
+  /// Default constructor
+  COrderingBase() { }
 
   // Destructor
-  virtual ~CDynamicOrderBase() { }
+  virtual ~COrderingBase() { }
 
   /// Comparison of monomials
   virtual comp_type compare(idx_type, idx_type) const = 0;
@@ -164,6 +146,9 @@ public:
   /// Check, whether two indices are in the same block 
   /// (true for nonblock orderings)
   virtual bool_type lieInSameBlock(idx_type, idx_type) const = 0;
+
+  /// Generic procedure to get index, where last block starts
+  virtual idx_type lastBlockStart() const = 0;
 
 protected:
   /// Get monomial from set of subsets of Boolean variables (internal use only)

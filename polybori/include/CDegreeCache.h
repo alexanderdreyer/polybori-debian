@@ -109,7 +109,7 @@ public:
   typedef typename CTypes::size_type size_type;
 
   /// Type of decision diagram manager
-  typedef typename CTypes::manager_base manager_type;
+  typedef BoolePolyRing manager_type;
 
   /// Construct from index
   CIndexHandle(idx_type idx): m_idx(idx) {}
@@ -161,11 +161,11 @@ public:
   /// Type for representing indices
   typedef typename navigator::value_type idx_type;
 
-   /// Type for representing size
+  /// Type for representing size
   typedef typename navigator::size_type size_type;
 
   /// Type of decision diagram manager
-  typedef typename CTypes::manager_base manager_type;
+  typedef BoolePolyRing manager_type;
 
   /// Construct from index
   CIndexCacheHandle(idx_type idx, const manager_type& mgr):
@@ -182,9 +182,9 @@ protected:
   navigator toNode(idx_type idx, const manager_type& mgr) const {
 
     if LIKELY((size_type)idx < mgr.nVariables())
-      return  navigator(mgr.getVar(idx));
+      return  mgr.variable(idx).navigation();
 
-    return  navigator(mgr.zddZero());
+    return  mgr.zero().navigation();
   }
 
   /// Actual navigator, which is stored
@@ -194,14 +194,14 @@ protected:
 template <class TagType = typename CCacheTypes::degree,
           class DDType = typename CTypes::dd_type>
 class CDegreeCache:
-  public CCacheManagement<TagType, 1> {
+  public CCacheManagement<BoolePolyRing, TagType, 1> {
 
 public:
   /// @name Define generic access to data types
   //@{
   typedef DDType dd_type;
   typedef TagType tag_type;
-  typedef CCacheManagement<tag_type, 1> base;
+  typedef CCacheManagement<BoolePolyRing, tag_type, 1> base;
   typedef CDegreeCache<tag_type, dd_type> self;
   //@}
 
@@ -250,14 +250,14 @@ public:
 template <class TagType =  typename CCacheTypes::block_degree,
           class DDType = typename CTypes::dd_type>
 class CBlockDegreeCache:
-  public CCacheManagement<TagType, 2> {
+  public CCacheManagement<BoolePolyRing, TagType, 2> {
 
 public:
   /// @name Define generic access to data types
   //@{
   typedef DDType dd_type;
   typedef TagType tag_type;
-  typedef CCacheManagement<tag_type, 2> base;
+  typedef CCacheManagement<BoolePolyRing, tag_type, 2> base;
   typedef CBlockDegreeCache<tag_type, dd_type> self;
   //@}
 
@@ -306,14 +306,14 @@ public:
 template <class TagType, 
           class DDType = typename CTypes::dd_type>
 class CDegreeArgumentCache:
-  public CCacheManagement<TagType, 2> {
+  public CCacheManagement<BoolePolyRing, TagType, 2> {
 
 public:
   /// @name Define generic access to data types
   //@{
   typedef DDType dd_type;
   typedef TagType tag_type;
-  typedef CCacheManagement<tag_type, 2> base;
+  typedef CCacheManagement<BoolePolyRing, tag_type, 2> base;
   typedef CDegreeArgumentCache<tag_type, dd_type> self;
   //@}
 

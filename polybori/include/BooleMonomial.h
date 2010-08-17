@@ -192,7 +192,7 @@ class BooleMonomial {
 
  public:
   template <class, class> friend class CDDOperations;
-  friend class COrderBase;
+  friend class COrderingBase;
   template <class> friend class CTermGeneratorBase;
   template <class, class> friend class CTermGeneratorBase__;
   //-------------------------------------------------------------------------
@@ -379,7 +379,7 @@ class BooleMonomial {
   /// Removes the first variables from monomial
   self& popFirst() { 
     assert(!m_poly.isConstant());
-    return *this = set_type( dd_type(m_poly.diagram().manager(),
+    return *this = set_type( dd_type(m_poly.ring(),
                                      m_poly.navigation().thenBranch()) ); 
   }
 

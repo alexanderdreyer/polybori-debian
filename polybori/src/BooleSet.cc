@@ -299,7 +299,7 @@ BooleSet::const_iterator
 BooleSet::begin() const {
 
   PBORI_TRACE_FUNC( "BooleSet::begin() const" );
-  return const_iterator(navigation(), managerCore());
+  return const_iterator(navigation(), ring());
 }
 
 // Finish of iteration over monomials
@@ -314,7 +314,7 @@ BooleSet::const_reverse_iterator
 BooleSet::rbegin() const {
 
   PBORI_TRACE_FUNC( "BooleSet::rbegin() const" );
-  return const_reverse_iterator(navigation(), managerCore());
+  return const_reverse_iterator(navigation(), ring());
 }
 
 // Finish of iteration over monomials
@@ -330,7 +330,7 @@ BooleSet::exp_iterator
 BooleSet::expBegin() const {
 
   PBORI_TRACE_FUNC( "BooleSet::exp_begin() const" );
-  return exp_iterator(base::navigation(), base::managerCore());
+  return exp_iterator(base::navigation(), base::ring());
 }
 
 // Finish of iteration over monomials
@@ -356,8 +356,8 @@ BooleSet::firstDivisorsOf(const self& rhs) const {
 
   PBORI_TRACE_FUNC( "BooleSet::divisorsOf(const term_type&) const" );
 
-  typedef CCacheManagement<CCacheTypes::divisorsof> cache_type;
-  return dd_first_divisors_of( cache_type(manager()), 
+  typedef CCacheManagement<ring_type, CCacheTypes::divisorsof> cache_type;
+  return dd_first_divisors_of( cache_type(ring()), 
                                navigation(), rhs.navigation(), 
                                self() );
 }
@@ -381,10 +381,10 @@ BooleSet::divisorsOf(const exp_type& rhs) const {
 
 BooleSet BooleSet::multiplesOf(const term_type& rhs) const{
 
-  typedef CCacheManagement<CCacheTypes::multiplesof> cache_type;
+  typedef CCacheManagement<ring_type, CCacheTypes::multiplesof> cache_type;
 
   return 
-    dd_first_multiples_of( cache_type(base::manager()), navigation(),
+    dd_first_multiples_of( cache_type(ring()), navigation(),
                            rhs.diagram().navigation(), self() );
 }
 
@@ -420,8 +420,8 @@ BooleSet::minimalElements() const {
   typedef CacheManager<CCacheTypes::minimal_elements> cache_mgr_type;
   typedef CacheManager<CCacheTypes::mod_mon_set> modmon_mgr_type;
 
-  return dd_minimal_elements(cache_mgr_type(base::manager()),
-                             modmon_mgr_type(base::manager()),
+  return dd_minimal_elements(cache_mgr_type(ring()),
+                             modmon_mgr_type(ring()),
                              base::navigation(), self());
 }
 
@@ -468,9 +468,9 @@ BooleSet::existAbstract(const term_type& rhs) const {
 
   PBORI_TRACE_FUNC( "BooleSet::existAbstract(const term_type&) const" );
 
-  typedef CCacheManagement<CCacheTypes::exist_abstract> cache_mgr_type;
+  typedef CCacheManagement<ring_type, CCacheTypes::exist_abstract> cache_mgr_type;
   return 
-    dd_existential_abstraction(cache_mgr_type(base::manager()), 
+    dd_existential_abstraction(cache_mgr_type(ring()), 
                                rhs.diagram().navigation(), base::navigation(),
                                self());
 }
@@ -499,7 +499,7 @@ BooleSet::print(ostream_type& os) const {
   else {
     os << "{{";
     dd_print_terms(begin(), end(), 
-                   variable_name<mgr_type>(managerCore()), 
+                   variable_name<ring_type>(ring()), 
                    sep_literal_type(), comma_as_separator(), 
                    empty_type(), os);
     os << "}}";
