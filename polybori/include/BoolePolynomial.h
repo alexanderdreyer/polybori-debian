@@ -27,7 +27,6 @@
 // get standard algorithmic functionalites
 #include <algorithm>
 
-#include "BooleRing.h"
 #include "BoolePolyRing.h"
 
 // include definition of sets of Boolean variables
@@ -466,7 +465,7 @@ public:
   bool_type isPair() const { return dd_is_pair(navigation()); }
 
   /// Access ring, where this belongs to
-  ring_type ring() const {  return ring_type(m_dd.ring()); } 
+  const ring_type& ring() const {  return m_dd.ring(); } 
 
   /// Compare with right-hand side and return comparision code
   comp_type compare(const self&) const;

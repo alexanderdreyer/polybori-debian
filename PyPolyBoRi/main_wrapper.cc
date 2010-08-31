@@ -123,16 +123,9 @@ BOOST_PYTHON_MODULE(PyPolyBoRi){
   def("get_order_code",&BooleEnv::getOrderCode);  
   def("print_ring_info", &BooleEnv::printInfo);
   
-  boost::python::class_<BooleRing>("BooleRing", "Boolean ring", 
-                                   boost::python::init <BooleRing::size_type>())
-
-    .def("clone", &BooleRing::clone, "copies also variable name vector in a new one, so somewhat deeper copy function")
-    .def("n_variables", &BooleRing::nVariables, "Number of ring variables")
-    .def("__hash__", &BooleRing::hash);
-
-  boost::python::class_<BoolePolyRing, 
-    boost::python::bases<BooleRing> >("Ring", "Boolean polynomial ring") 
+  boost::python::class_<BoolePolyRing>("Ring", "Boolean polynomial ring") 
     //.def(boost::python::init <>())
+    .def("n_variables", &BoolePolyRing::nVariables, "Number of ring variables")
     .def("__hash__", &BoolePolyRing::hash)
     .def("var", ring_var, "i-th ring Variable")
     .def("one", ring_one, "Polynomial one")
@@ -201,7 +194,9 @@ with inverted variable order\n\
   .def("__pow__", var_power)
   .def("index", &BooleVariable::index, "Variable position in the ring")
   .def("set",&BooleVariable::set, "Convert to BooleSet")
-  .def("ring", &BooleVariable::ring, "Get corresponding ring");
+  .def("ring", &BooleVariable::ring,
+       return_internal_reference<>(),
+       "Get corresponding ring");
   boost::python::register_exception_translator<PBoRiError>(translator_pborierror);
   typedef PBoRiGenericError<CTypes::division_by_zero> pbori_div_by_zero;
   boost::python::register_exception_translator<pbori_div_by_zero>(translator_pboridivisionbyzero);
