@@ -22,17 +22,17 @@
 // load polybori header file
 # include "polybori.h"
 
-#include "pbori_algo.h"
+#include <polybori/routines/pbori_algo.h>
 
-#include "pbori_func.h"
+#include <polybori/routines/pbori_func.h>
 
-#include "CTermIter.h"
+#include <polybori/iterators/CTermIter.h>
 
-#include "CCuddLastIter.h"
+#include <polybori/iterators/CCuddLastIter.h>
 
-#include "BoolePolynomial.h"
+#include "polybori/BoolePolynomial.h"
 
-#include "CTermStack.h"
+#include <polybori/iterators/CTermStack.h>
 
 USING_NAMESPACE_PBORI
 

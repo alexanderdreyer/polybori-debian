@@ -116,7 +116,7 @@
 // load polybori header file
 # include "polybori.h"
 
-#include "CDegLexIter.h"
+#include <polybori/iterators/CDegLexIter.h>
   //#include "COrderedIter.h"
 
 

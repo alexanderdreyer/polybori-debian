@@ -18,10 +18,10 @@
 
 // load polybori header file
 # include "polybori.h"
-# include "pbori_func.h"
+# include <polybori/routines/pbori_func.h>
 
-#include "CIdxPath.h"
-#include "CStringLiteral.h"
+#include "polybori/CIdxPath.h"
+#include <polybori/literals/CStringLiteral.h>
 
 USING_NAMESPACE_PBORI
 

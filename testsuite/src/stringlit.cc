@@ -23,9 +23,9 @@
 // load polybori header file
 # include "polybori.h"
 
-# include "CStringLiteral.h"
+# include <polybori/literals/CStringLiteral.h>
 
-# include "CLiteralCodes.h"
+# include <polybori/literals/CLiteralCodes.h>
 
 USING_NAMESPACE_PBORI
 

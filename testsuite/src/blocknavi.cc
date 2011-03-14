@@ -19,10 +19,10 @@
 
 // load polybori header file
 # include "polybori.h"
-#include "pbori_routines.h"
+#include <polybori/routines/pbori_routines.h>
 
-#include "CDegreeCache.h"
-#include "CCacheManagement.h"
+#include <polybori/cache/CDegreeCache.h>
+#include <polybori/cache/CCacheManagement.h>
 
 USING_NAMESPACE_PBORI
 
