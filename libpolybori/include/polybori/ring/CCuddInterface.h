@@ -173,6 +173,7 @@ public:
     return checkedResult(DD_ONE(getManager()));
   }
 
+#ifdef CUDD_ORIGINAL_INCLUSION
   /// @name Member functions mimicking/interfacing with CUDD procedures 
   /// @note See preprocessor generated members below
   //@{
@@ -282,6 +283,9 @@ public:
   PB_CUDDMGR_SET(BOOST_PP_NIL, Cudd_ReorderingType, AutodynEnableZdd)
   PB_CUDDMGR_SET(BOOST_PP_NIL, unsigned long, SetMaxMemory)
   PB_CUDDMGR_SET(BOOST_PP_NIL, double, SetMaxGrowth)
+#else
+  BOOST_PP_SEQ_FOR_EACH(PB_CUDDMGR_READ, int,(ReadZddSize))
+#endif
   /** @endcode */
   /// 
   //@}
