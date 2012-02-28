@@ -1,3 +1,9 @@
+polybori (0.8.0-0) unstable; urgency=low
+
+  * New version of the PolyBoRi framework.
+
+ -- Alexander Dreyer <adreyer@gmx.de>  Tue, 23 Aug 2011 12:30:00 +0100
+
 polybori (0.5~rc1-2.1) unstable; urgency=low
 
   * Non-maintainer upload. Thanks to Kumar Appaiah for the initial patch.

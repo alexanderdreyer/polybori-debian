@@ -9,18 +9,16 @@ build: $(PYVERS:%=build-python%)
 	touch $@
 build-python%: TMPDEST=debian/python-polybori$*
 build-python%: PYTHON=/usr/bin/python$*
-build-python%: BOOST_LIBRARY=boost_python-py$(subst .,,$*)
 build-python%: PYTHONSITE=`/usr/bin/python$* -c 'import setuptools; print setuptools.distutils.sysconfig.get_python_lib() '`
-build-python%: debian/stamp-patched
+build-python%:
 	echo $(TMPDEST)
-	scons prepare-install PYTHON=$(PYTHON) BOOST_LIBRARY=$(BOOST_LIBRARY)
+	scons prepare-install PYTHON=$(PYTHON)
 	mkdir -p $(TMPDEST)
 	scons install devel-install INSTALLDIR=$(TMPDEST)/usr/lib/polybori \
 		PYINSTALLPREFIX=$(TMPDEST)$(PYTHONSITE) MANDIR=$(TMPDEST)/usr/share/man \
 		PREFIX=$(TMPDEST)/usr EPREFIX=$(TMPDEST)/usr/bin \
-		DOCDIR=$(TMPDEST)/usr/share/doc/polybori \
-		PYTHON=$(PYTHON) BOOST_LIBRARY=$(BOOST_LIBRARY) \
-		RELATIVEPYPREFIX=$(PYTHONSITE)
+		DOCDIR=$(TMPDEST)/usr/share/doc/polybori PYTHON=$(PYTHON) \
+		RELATIVEPYPREFIX=/usr/lib/python$(lastword $(PYVERS))/site-packages
 	touch $@
 
 $(patsubst %,binary-install/%,$(DEB_PACKAGES)) :: binary-install/%:
@@ -40,3 +38,4 @@ clean::
 	rm -rf .sconf_temp/
 	rm -f .sconsign.dblite
 	rm -f build build-python*
+
