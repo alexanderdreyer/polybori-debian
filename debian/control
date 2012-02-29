@@ -7,7 +7,7 @@ Homepage: http://polybori.sourceforge.net/
 Vcs-Git: git://git.debian.org/git/debian-science/packages/polybori.git (not merged yet, FIXME)
 Vcs-Browser: http://git.debian.org/?p=debian-science/packages/polybori.git ( dito FIXME )
 # DM-Upload-Allowed: yes
-Build-Depends: cdbs (>= 0.4.23-1.1), debhelper (>= 5), quilt, patchutils (>= 0.2.25), cdbs (>= 0.4.27-1), scons, python-setuptools, libboost-dev, libboost-python-dev (>=1.39), doxygen (>= 1.4.6), hevea | tex4ht, python-all-dev (>= 2.3.5-11), python-central (>= 0.5.6)
+Build-Depends: debhelper (>= 5), patchutils (>= 0.2.25), scons, python-setuptools, libboost-dev, libboost-python-dev (>=1.39), doxygen (>= 1.4.6), hevea | tex4ht, python-all-dev (>= 2.3.5-11), python-central (>= 0.5.6)
 XS-Python-Version: all
 Standards-Version: 3.8.0
 
