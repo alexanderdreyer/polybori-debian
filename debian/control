@@ -2,11 +2,11 @@ Source: polybori
 Section: math
 Priority: extra
 Maintainer: Debian Science Maintainers <debian-science-maintainers@lists.alioth.debian.org> 
-Uploaders: Alexander Dreyer <adreyer@gmx.de>
+Uploaders: Alexander Dreyer <adreyer@gmx.de>, Felix Salfelder <felix@salfelder.org>
 Homepage: http://polybori.sourceforge.net/
-Vcs-Git: git://git.debian.org/git/debian-science/packages/polybori.git (not merged yet, FIXME)
-Vcs-Browser: http://git.debian.org/?p=debian-science/packages/polybori.git ( dito FIXME )
-# DM-Upload-Allowed: yes
+Vcs-Git: git://git.debian.org/git/debian-science/packages/polybori.git
+Vcs-Browser: http://git.debian.org/?p=debian-science/packages/polybori.git
+DM-Upload-Allowed: yes
 Build-Depends: debhelper (>= 5), patchutils (>= 0.2.25), scons, python-setuptools, libboost-dev, libboost-python-dev (>=1.39), doxygen (>= 1.4.6), hevea | tex4ht, python-all-dev (>= 2.3.5-11), python-central (>= 0.5.6)
 XS-Python-Version: all
 Standards-Version: 3.8.0
