@@ -70,7 +70,7 @@ Description: Polynomials over Boolean Rings, shared library
 
 Package: polybori-doc
 Section: doc
-Architecture: any
+Architecture: all
 Description: Polynomials over Boolean Rings, shared library
  The core of PolyBoRi is a C++ library, which provides high-level data
  types for Boolean polynomials and monomials, exponent vectors, as
