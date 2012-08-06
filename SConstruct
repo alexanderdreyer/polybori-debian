@@ -144,6 +144,8 @@ opts.Add(BoolOption('HAVE_PYTHON_EXTENSION',
                     'Build python extension, if possible', True))
 opts.Add(BoolOption('BOOST_WORKS',
                     'Skip check for Boost libraries', False))
+opts.Add('BOOST_LIBRARY',
+         'Name of Boost library to link with', 'boost_python')
 
 opts.Add(BoolOption('RELATIVE_SYMLINK',
                     'Use relative symbolic links on install', True))
@@ -494,8 +496,7 @@ for t in tests_gb:
         [TestsPath('src', t + ".cc"), libpb, gb]+ libCudd, 
         CPPPATH=CPPPATH)
 
-
-LIBS = env['LIBS']+['boost_python']+USERLIBS
+LIBS = env['LIBS']+[env['BOOST_LIBRARY']]+USERLIBS
 
 LIBS_static = ["polybori", 'groebner', cudd_name] + LIBS
 #env["CPPDEFINES"].Append("Packed")
