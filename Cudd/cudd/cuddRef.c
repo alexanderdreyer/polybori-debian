@@ -31,7 +31,7 @@
 
   Author      [Fabio Somenzi]
 
-  Copyright   [Copyright (c) 1995-2004, Regents of the University of Colorado
+  Copyright   [Copyright (c) 1995-2012, Regents of the University of Colorado
 
   All rights reserved.
 
@@ -68,6 +68,10 @@
 #include "util.h"
 #include "cuddInt.h"
 
+#ifndef PBORI_FORCE_ORIGINAL_CUDD
+#include <polybori/cudd/prefix_internal.h>
+#endif
+
 /*---------------------------------------------------------------------------*/
 /* Constant declarations                                                     */
 /*---------------------------------------------------------------------------*/
@@ -88,7 +92,7 @@
 /*---------------------------------------------------------------------------*/
 
 #ifndef lint
-static char rcsid[] DD_UNUSED = "$Id$";
+static char rcsid[] DD_UNUSED = "$Id: cuddRef.c,v 1.29 2012/02/05 01:07:19 fabio Exp $";
 #endif
 
 /*---------------------------------------------------------------------------*/

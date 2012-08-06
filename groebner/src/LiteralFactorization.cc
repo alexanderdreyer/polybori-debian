@@ -271,7 +271,7 @@ LiteralFactorization::LiteralFactorization(const Polynomial& p):
                 while(other_it!=other_end){
                     
                     idx_type v2=*other_it;
-                    if (UNLIKELY(p.ring().ordering().compare(v, v2)!=BoolePolyRing::greater_than)){
+                    if (PBORI_UNLIKELY(p.ring().ordering().compare(v, v2)!=BoolePolyRing::greater_than)){
                         ++other_it;
                         continue;
                     }
@@ -397,16 +397,16 @@ bool maps_to_one( const std::pair<const polybori::groebner::idx_type, int> v){
 bool maps_to_zero( const std::pair<const polybori::groebner::idx_type, int>  v){
     return (v.second==0);
 }
-bool LiteralFactorization::is11Factorization(){
-    if (this->factors.size()==lmDeg){
+bool LiteralFactorization::is11Factorization() const {
+  if (this->factors.size() == std::size_t(lmDeg)){
         if (find_if(factors.begin(),factors.end(), maps_to_zero)==factors.end()){
             return true;
         } else return false;
     }
     return false;
 }
-bool LiteralFactorization::is00Factorization(){
-    if (this->factors.size()==lmDeg){
+bool LiteralFactorization::is00Factorization() const {
+  if (this->factors.size() == std::size_t(lmDeg)){
         if (find_if(factors.begin(),factors.end(), maps_to_one)==factors.end()){
             return true;
         } else return false;

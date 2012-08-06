@@ -35,7 +35,7 @@
 
 BEGIN_NAMESPACE_PBORIGB
 
-static MonomialSet divide_monomial_divisors_out(const BooleSet& s, const Monomial& lm);
+//static MonomialSet divide_monomial_divisors_out(const BooleSet& s, const Monomial& lm);
 
 
 //Variant for navigaor
@@ -319,32 +319,33 @@ return
 //static Monomial oper(int i){
 //    return Monomial(Variable(i));
 //}
-static MonomialSet divide_monomial_divisors_out_old(const MonomialSet& s, const Monomial& lm){
-  /// deactivated, because segfaults on SatTestCase, AD
-  ///   return s.existAbstract(lm.diagram());
-  /**/
-    MonomialSet m=s;
-    Monomial::const_iterator it_lm=lm.begin();
-        Monomial::const_iterator end_lm=lm.end();
-        while(it_lm!=end_lm){
-            idx_type i=*it_lm;
-            m=m.subset0(i).unite(m.subset1(i));
-            it_lm++;
-        }
-   return m;/**/
-}
-static MonomialSet do_divide_monomial_divisors_out(const MonomialSet& s, Monomial::const_iterator it, Monomial::const_iterator end){
-    if(it==end) return s;
-    if (s.isZero()) return s;
+// static MonomialSet divide_monomial_divisors_out_old(const MonomialSet& s, const Monomial& lm){
+//   /// deactivated, because segfaults on SatTestCase, AD
+//   ///   return s.existAbstract(lm.diagram());
+//   /**/
+//     MonomialSet m=s;
+//     Monomial::const_iterator it_lm=lm.begin();
+//         Monomial::const_iterator end_lm=lm.end();
+//         while(it_lm!=end_lm){
+//             idx_type i=*it_lm;
+//             m=m.subset0(i).unite(m.subset1(i));
+//             it_lm++;
+//         }
+//    return m;/**/
+// }
+// static MonomialSet do_divide_monomial_divisors_out(const MonomialSet& s, Monomial::const_iterator it, Monomial::const_iterator end){
+//     if(it==end) return s;
+//     if (s.isZero()) return s;
     
-    Monomial::const_iterator itpp=it;
-    itpp++;
-    return (do_divide_monomial_divisors_out(s.subset0(*it),itpp,end).unite(do_divide_monomial_divisors_out(s.subset1(*it),itpp,end)));
+//     Monomial::const_iterator itpp=it;
+//     itpp++;
+//     return (do_divide_monomial_divisors_out(s.subset0(*it),itpp,end).unite(do_divide_monomial_divisors_out(s.subset1(*it),itpp,end)));
     
-}
-static MonomialSet divide_monomial_divisors_out(const BooleSet& s, const Monomial& lm){
-    return do_divide_monomial_divisors_out(s,lm.begin(),lm.end());
-}
+// }
+
+// static MonomialSet divide_monomial_divisors_out(const BooleSet& s, const Monomial& lm){
+//     return do_divide_monomial_divisors_out(s,lm.begin(),lm.end());
+// }
 
 
 // Core function which uses the manager given as firt argument
@@ -368,21 +369,6 @@ MonomialSet recursively_insert(MonomialSet::navigator p, idx_type idx, MonomialS
   return recursively_insert(mset.ring(), p, idx, mset.navigation());
 }
 
-void addPolynomialToReductor(Polynomial& p, MonomialSet& m){
-    Monomial lm=p.lead();
-    PBORI_ASSERT (!(m.isZero()));
-    idx_type lead_index=*(lm.begin());
-    Exponent red_lead=*m.expBegin();
-    if (std::find(red_lead.begin(),red_lead.end(),lead_index)==red_lead.end()){
-        //this->log("linear lead reductor\n");
-        p=ll_red_nf(p,m);
-        PBORI_ASSERT(p.lead()==lm);
-        m=ll_red_nf(m,MonomialSet(p.diagram())).diagram();
-        //PBORI_ASSERT(ll_red_nf(m+m.lead(),m)==m+m.lead());
-        m=recursively_insert(p.navigation().elseBranch(),
-                             lead_index, m);
-    }
-}
 
 
 
@@ -426,12 +412,6 @@ Polynomial map_every_x_to_x_plus_one(Polynomial p){
 }
 
 
-
-
-
-static int get_first_variable_index(const Polynomial& p){
-    return *(p.navigation());
-}
 
 
 Polynomial mult_fast_sim(const std::vector<Polynomial>& vec,

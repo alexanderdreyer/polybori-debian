@@ -78,7 +78,7 @@ BooleMonomial::operator/=(const self& rhs) {
   PBORI_TRACE_FUNC( "BooleMonomial::operator*=(const self&)" );
 
   m_poly /= rhs;//.m_poly;
-  if UNLIKELY(m_poly.isZero())
+  if PBORI_UNLIKELY(m_poly.isZero())
     throw PBoRiError(CTypes::monomial_zero);
 
   return *this;
@@ -104,7 +104,7 @@ BooleMonomial::operator/=(const var_type& rhs) {
   PBORI_TRACE_FUNC( "BooleMonomial::operator/=(const var_type&)" );
 
   m_poly = internalDiagram().subset1(rhs.index());
-  if UNLIKELY(m_poly.isZero())
+  if PBORI_UNLIKELY(m_poly.isZero())
     throw PBoRiError(CTypes::monomial_zero);
 
   return *this;
@@ -265,6 +265,8 @@ BooleMonomial::var_type
 BooleMonomial::firstVariable() const {
 
   PBORI_TRACE_FUNC( "BooleMonomial::firstVariable() const" );
+  if PBORI_UNLIKELY(m_poly.isConstant())
+    throw PBoRiError(CTypes::out_of_bounds);
   return var_type(firstIndex(), ring());
 }
 END_NAMESPACE_PBORI

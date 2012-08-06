@@ -51,7 +51,7 @@ struct cached_deg {
   typedef typename cache_type::manager_type manager_type;
   cached_deg(const manager_type & mgr): m_deg_cache(mgr) {}
 
-  typename NavigatorType::size_type
+  typename NavigatorType::deg_type
   operator()(NavigatorType navi) const {
     return dd_cached_degree(m_deg_cache, navi);
   }
@@ -264,7 +264,7 @@ public:
   }
 
   bool_type markedOne() const {
-    if UNLIKELY(empty())
+    if PBORI_UNLIKELY(empty())
       return false;
     else
       return !m_stack.front().isValid();
@@ -411,7 +411,7 @@ public:
     bool invalid = true;
     while (!base::empty() && invalid) {
       incrementElse();
-      if (invalid = base::isInvalid())
+      if ((invalid = base::isInvalid()))
         base::decrementNode();
     }
   }
@@ -423,13 +423,13 @@ public:
 
   void increment() {
     PBORI_ASSERT(!base::empty());
-    if UNLIKELY(base::markedOne()) {
+    if PBORI_UNLIKELY(base::markedOne()) {
       base::clearOne();
       return;
     }
       
     next();
-    if UNLIKELY(!base::empty()) {
+    if PBORI_UNLIKELY(!base::empty()) {
       followThen();
       terminate();
     }
@@ -438,11 +438,11 @@ public:
 
    void decrement() {
 
-    if UNLIKELY(base::markedOne()) {
+    if PBORI_UNLIKELY(base::markedOne()) {
       base::clearOne();
     }
     previous();
-    if UNLIKELY(!base::empty()){
+    if PBORI_UNLIKELY(!base::empty()){
       followElse();
       base::decrementNode();
     }
@@ -454,7 +454,7 @@ public:
 
     bool isZero = base::isInvalid();
     base::decrementNode();
-    if UNLIKELY(base::empty() && !isZero)
+    if PBORI_UNLIKELY(base::empty() && !isZero)
       base::markOne();
   }
 
@@ -591,6 +591,7 @@ public:
   typedef CTermStack<NavigatorType, Category, BaseType> base;
   typedef NavigatorType navigator;
   typedef typename base::idx_type idx_type;
+  typedef typename base::deg_type deg_type;
   typedef typename base::size_type size_type;
   typedef typename cached_block_deg<navigator>::manager_type manager_type;
 
@@ -601,7 +602,7 @@ public:
   CDegStackCore(const CDegStackCore& rhs):
     base(rhs), block(rhs.block) {}
 
-  size_type getDeg(navigator navi) const { return block(navi); }
+  deg_type getDeg(navigator navi) const { return block(navi); }
 
   bool atBegin() const { 
     return base::empty() || (base::index() < block.min()); 
@@ -627,7 +628,7 @@ public:
     while (!atBegin() && invalid) {
       PBORI_ASSERT(!base::isConstant());
       base::incrementElse();
-      if (invalid = base::isInvalid())
+      if ((invalid = base::isInvalid()))
         base::decrementNode();
     }
   }
@@ -810,7 +811,7 @@ public:
         }
         base::gotoEnd();
 
-        if (doloop = (base::isInvalid() || (base::size() != size)) )
+        if ((doloop = (base::isInvalid() || (base::size() != size)) ) )
           base::decrementNode();
 
     } while (!base::empty() && doloop);
@@ -853,7 +854,7 @@ public:
     PBORI_ASSERT(m_zero.isValid());
     PBORI_ASSERT(m_zero.isEmpty());
 
-    push(m_zero);
+    base::push(m_zero);
   }
 
 private:

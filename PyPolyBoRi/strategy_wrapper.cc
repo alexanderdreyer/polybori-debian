@@ -29,9 +29,8 @@ using namespace std;
 USING_NAMESPACE_PBORIGB
 USING_NAMESPACE_PBORI
 
-class StrategyIndexException{
-    
-};
+class StrategyIndexException {};
+
 static void translator_gi(StrategyIndexException const& x) {
     PyErr_SetString( PyExc_IndexError, "Wrong Index access at strategy");
 }
@@ -80,27 +79,27 @@ static int pairs_top_sugar(const GroebnerStrategy& strat){
 static void cleanTopByChainCriterion(GroebnerStrategy & strat){
   strat.pairs.cleanTopByChainCriterion();
 }
-static void printGenerators(GroebnerStrategy& strat){
-  int i;
-  for (i=0;i<strat.generators.size();i++){
-    std::cout<<(strat.generators[i].p)<<std::endl;
-  }
-}
-static vector<Polynomial> nextDegreeSpolys(GroebnerStrategy& strat){
-  vector<Polynomial> res;
-  PBORI_ASSERT(!(strat.pairs.pairSetEmpty()));
-  strat.pairs.cleanTopByChainCriterion();
-  deg_type deg=strat.pairs.queue.top().sugar;
+
+// static void printGenerators(const GroebnerStrategy& strat){
+//   for (std::size_t i=0;i<strat.generators.size();i++){
+//     std::cout<<(strat.generators[i].p)<<std::endl;
+//   }
+// }
+// static vector<Polynomial> nextDegreeSpolys(GroebnerStrategy& strat){
+//   vector<Polynomial> res;
+//   PBORI_ASSERT(!(strat.pairs.pairSetEmpty()));
+//   strat.pairs.cleanTopByChainCriterion();
+//   deg_type deg=strat.pairs.queue.top().sugar;
   
-  while((!(strat.pairs.pairSetEmpty())) &&(strat.pairs.queue.top().sugar<=deg)){
+//   while((!(strat.pairs.pairSetEmpty())) &&(strat.pairs.queue.top().sugar<=deg)){
     
-    PBORI_ASSERT(strat.pairs.queue.top().sugar==deg);
-    res.push_back(strat.nextSpoly());
-    strat.pairs.cleanTopByChainCriterion();
-  }
-  return res;
+//     PBORI_ASSERT(strat.pairs.queue.top().sugar==deg);
+//     res.push_back(strat.nextSpoly());
+//     strat.pairs.cleanTopByChainCriterion();
+//   }
+//   return res;
   
-}
+// }
 
 static vector<Polynomial> someNextDegreeSpolys(GroebnerStrategy& strat, int n){
   vector<Polynomial> res;
@@ -108,7 +107,8 @@ static vector<Polynomial> someNextDegreeSpolys(GroebnerStrategy& strat, int n){
   strat.pairs.cleanTopByChainCriterion();
   deg_type deg=strat.pairs.queue.top().sugar;
   
-  while((!(strat.pairs.pairSetEmpty())) &&(strat.pairs.queue.top().sugar<=deg) && (res.size()<n)){
+  while((!(strat.pairs.pairSetEmpty())) &&
+        (strat.pairs.queue.top().sugar<=deg) && (res.size() < (std::size_t)n)){
     
     PBORI_ASSERT(strat.pairs.queue.top().sugar==deg);
     res.push_back(strat.nextSpoly());
@@ -117,21 +117,21 @@ static vector<Polynomial> someNextDegreeSpolys(GroebnerStrategy& strat, int n){
   return res;
   
 }
-static vector<Polynomial> small_next_degree_spolys(GroebnerStrategy& strat, double f, int n){
-  vector<Polynomial> res;
-  PBORI_ASSERT(!(strat.pairs.pairSetEmpty()));
-  strat.pairs.cleanTopByChainCriterion();
-  deg_type deg=strat.pairs.queue.top().sugar;
-  wlen_type wlen=strat.pairs.queue.top().wlen;
-  while((!(strat.pairs.pairSetEmpty())) &&(strat.pairs.queue.top().sugar<=deg) && (strat.pairs.queue.top().wlen<=wlen*f+2)&& (res.size()<n)){
+// static vector<Polynomial> small_next_degree_spolys(GroebnerStrategy& strat, double f, int n){
+//   vector<Polynomial> res;
+//   PBORI_ASSERT(!(strat.pairs.pairSetEmpty()));
+//   strat.pairs.cleanTopByChainCriterion();
+//   deg_type deg=strat.pairs.queue.top().sugar;
+//   wlen_type wlen=strat.pairs.queue.top().wlen;
+//   while((!(strat.pairs.pairSetEmpty())) &&(strat.pairs.queue.top().sugar<=deg) && (strat.pairs.queue.top().wlen<=wlen*f+2)&& (res.size()<(std::size_t)n)){
     
-    PBORI_ASSERT(strat.pairs.queue.top().sugar==deg);
-    res.push_back(strat.nextSpoly());
-    strat.pairs.cleanTopByChainCriterion();
-  }
-  return res;
+//     PBORI_ASSERT(strat.pairs.queue.top().sugar==deg);
+//     res.push_back(strat.nextSpoly());
+//     strat.pairs.cleanTopByChainCriterion();
+//   }
+//   return res;
   
-}
+// }
 bool contains_one(const GroebnerStrategy& strat){
   int s=strat.generators.size();
   int i;
@@ -143,27 +143,24 @@ bool contains_one(const GroebnerStrategy& strat){
   return false;
 }
 static void implications(GroebnerStrategy& strat, int i){
-    strat.addNonTrivialImplicationsDelayed(strat.generators[i]);
+  strat.addNonTrivialImplicationsDelayed(const_cast<const GroebnerStrategy&>(strat).generators[i]);
     
 }
 int select_wrapped(const GroebnerStrategy & strat, const Monomial& m){
     return strat.generators.select1(m);
 }
-static Polynomial get_gen_by_lead(const GroebnerStrategy& strat,  const Monomial& m){
-    lm2Index_map_type::const_iterator it,end;
-    end=strat.generators.lm2Index.end();
-    it=strat.generators.lm2Index.find(m);
-    if UNLIKELY(it==end){
-        throw StrategyIndexException();
-    }
-    return strat.generators[it->second].p;
-}
-static Polynomial get_ith_gen(const GroebnerStrategy& strat, int i){
-    if UNLIKELY((i<0)||(i>=strat.generators.size())){
+
+static Polynomial get_ith_gen(const GroebnerStrategy& strat, std::size_t i){
+    if PBORI_UNLIKELY((i<0)||(i>=strat.generators.size())){
         throw StrategyIndexException();
     }
     return strat.generators[i].p;
 }
+
+static Polynomial get_gen_by_lead(const GroebnerStrategy& strat, const Monomial& m){
+  return get_ith_gen(strat, strat.generators.checked_index(m));
+}
+
 class DuplicateLeadException{};
 
 
@@ -176,9 +173,9 @@ static void translator_d(DuplicateLeadException const& x) {
 
 
 static void add_generator(GroebnerStrategy& strat, const Polynomial& p){
-    if UNLIKELY(p.isZero()) throw PolynomialIsZeroException();
+    if PBORI_UNLIKELY(p.isZero()) throw PolynomialIsZeroException();
     Monomial m=p.lead();
-    if UNLIKELY(strat.generators.leadingTerms.owns(m)) throw DuplicateLeadException();
+    if PBORI_UNLIKELY(strat.generators.leadingTerms.owns(m)) throw DuplicateLeadException();
     strat.addGenerator(p);
 }
 static StrategyIterator stratbegin(const GroebnerStrategy& strat){
@@ -189,17 +186,30 @@ static StrategyIterator stratend(const GroebnerStrategy& strat){
 }
 
 static void add_as_you_wish(GroebnerStrategy& strat, const Polynomial& p){
-    if UNLIKELY(p.isZero()) throw PolynomialIsZeroException();
+    if PBORI_UNLIKELY(p.isZero()) throw PolynomialIsZeroException();
     strat.addAsYouWish(p);
 }
 
 static void add_generator_delayed(GroebnerStrategy& strat, const Polynomial& p){
-    if UNLIKELY(p.isZero()) throw PolynomialIsZeroException();
+    if PBORI_UNLIKELY(p.isZero()) throw PolynomialIsZeroException();
     strat.addGeneratorDelayed(p);
+}
+
+template <class Type>
+void export_terms(const char* name) {
+  implicitly_convertible<MonomialSet, Type>();
+  implicitly_convertible<Type, MonomialSet >();
+
+  boost::python::class_<Type,
+    boost::python::bases<MonomialSet> > (name, name,
+                                         init<const BoolePolyRing&>());
+
 }
 
 void export_strategy(){
   export_slimgb();
+  export_terms<MonomialTerms>("MonomialTerms");
+
   def("easy_linear_factors", easy_linear_factors);
   boost::python::class_<PolyEntry>("PolyEntry",
                           "Entry with polynomial and statistical information",
@@ -218,12 +228,12 @@ void export_strategy(){
   .def_readwrite("minimal",&PolyEntry::minimal)
   .def("recompute_information",&PolyEntry::recomputeInformation);
   
+  implicitly_convertible<BoolePolynomial, PolyEntry>();
  
-  boost::python::class_<vector<PolyEntry> > ("PolyEntryVector")
-      .def(vector_indexing_suite<vector<PolyEntry> >());
- 
-  boost::python::class_<ReductionStrategy,boost::python::bases<vector<PolyEntry> > > ("ReductionStrategy", "ReductionStrategy",
-         init<const BoolePolyRing&>())
+
+  boost::python::class_<ReductionStrategy> ("ReductionStrategy",
+					    "ReductionStrategy",
+					    init<const BoolePolyRing&>())
         .def_readwrite("opt_brutal_reductions",&ReductionStrategy::optBrutalReductions)
         .def("add_generator", &ReductionStrategy::addGenerator)
         .def_readonly("leading_terms",&ReductionStrategy::leadingTerms)
@@ -261,10 +271,10 @@ void export_strategy(){
   .def("clean_top_by_chain_criterion", cleanTopByChainCriterion)
   .def("all_generators", &GroebnerStrategy::allGenerators)
   
-#if defined(HAVE_NTL) || defined(HAVE_M4RI)
+#if defined(PBORI_HAVE_NTL) || defined(PBORI_HAVE_M4RI)
   .def("noro_step", &GroebnerStrategy::noroStep)
 #endif
-#if defined(HAVE_NTL) || defined(HAVE_M4RI)
+#if defined(PBORI_HAVE_NTL) || defined(PBORI_HAVE_M4RI)
   .def("faugere_step_dense", &GroebnerStrategy::faugereStepDense)
 #endif
   .def("variable_has_value",&GroebnerStrategy::variableHasValue)

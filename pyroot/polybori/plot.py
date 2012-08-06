@@ -5,7 +5,35 @@ plot.py
 
 Created by Michael Brickenstein on 2008-10-17.
 Copyright (c) 2008 The PolyBoRi Team. 
+
+
 """
+
+def _exists():
+    """PolyBoRi convention: checking optional components for prerequisites here
+
+    >>> _exists()
+    True
+    """
+    try:
+        import jinja2
+    except ImportError:
+        try:
+            import jinja
+        except ImportError:
+            return False
+
+    try:
+        from subprocess import Popen, PIPE
+        from os import devnull
+        out = open(devnull)
+        process = Popen(["dot", "-V"], stderr=out, stdout=out)
+        out.close()
+    except:                           
+        return False   
+
+    return True
+
 
 import sys
 import os
@@ -103,7 +131,7 @@ def plot(p, filename, colored=True,format="png",
     EXAMPLES:
 
     >>> r=Ring(1000)
-    >>> x = Variable = VariableFactory(r)
+    >>> x = r.variable
     >>> plot(x(1)+x(0),"/dev/null", colored=True)
     >>> plot(x(1)+x(0),"/dev/null", colored=False)
     """

@@ -16,10 +16,10 @@
 #include "out_helper.h"
 #include "test_util.h"
 #include "fglm_wrapper.h"
-#ifdef HAVE_NTL
+#ifdef PBORI_HAVE_NTL
 #include "ntl_wrapper.h"
 #endif
-#ifdef HAVE_M4RI
+#ifdef PBORI_HAVE_M4RI
 #define PACKED 1
 extern "C"{
 #include <m4ri/m4ri.h>
@@ -33,10 +33,10 @@ using namespace std;
 BOOST_PYTHON_MODULE(PyPolyBoRi){
 
   export_main();
+  export_bset();
   export_strategy();
   export_fglm();
   export_monomial();
-  export_bset();
   export_variable_block();
   export_misc();
 }

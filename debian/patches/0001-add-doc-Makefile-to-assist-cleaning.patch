@@ -1,0 +1,79 @@
+From 2d68d516313ad44948c658adc23267f86516ad1e Mon Sep 17 00:00:00 2001
+From: Felix Salfelder <felix@salfelder.org>
+Date: Thu, 15 Mar 2012 10:49:36 +0100
+Subject: add doc/Makefile to assist cleaning.
+
+---
+ doc/Makefile          |    9 +++++++++
+ doc/python/Makefile   |   17 +++++++++++++++++
+ doc/tutorial/Makefile |   21 +++++++++++++++++++++
+ 3 files changed, 47 insertions(+)
+ create mode 100644 doc/Makefile
+ create mode 100644 doc/python/Makefile
+ create mode 100644 doc/tutorial/Makefile
+
+diff --git a/doc/Makefile b/doc/Makefile
+new file mode 100644
+index 0000000..909da80
+--- /dev/null
++++ b/doc/Makefile
+@@ -0,0 +1,9 @@
++
++SUBDIRS=python tutorial
++
++all:
++
++clean: clean-recursive
++
++%-recursive:
++	for i in $(SUBDIRS); do $(MAKE) -C $$i $*; done
+diff --git a/doc/python/Makefile b/doc/python/Makefile
+new file mode 100644
+index 0000000..bbc5564
+--- /dev/null
++++ b/doc/python/Makefile
+@@ -0,0 +1,17 @@
++
++all:
++
++clean:
++	rm -f polybori.addition.html
++	rm -f polybori.cluster.html
++	rm -f polybori.cnf.html
++	rm -f polybori.context.html
++	rm -f polybori.easy_polynomials.html
++	rm -f polybori.fglm.html
++	rm -f polybori.intersect.html
++	rm -f polybori.intpolys.html
++	rm -f polybori.parallel.html
++	rm -f polybori.parsegat.html
++	rm -f polybori.plot.html
++	rm -f polybori.rank.html
++
+diff --git a/doc/tutorial/Makefile b/doc/tutorial/Makefile
+new file mode 100644
+index 0000000..47d7100
+--- /dev/null
++++ b/doc/tutorial/Makefile
+@@ -0,0 +1,21 @@
++
++all:
++
++clean:
++	rm -f tutorial.4ct
++	rm -f tutorial.4tc
++	rm -f tutorial.aux
++	rm -f tutorial.css
++	rm -f tutorial.dvi
++	rm -f tutorial.html
++	rm -f tutorial.idv
++	rm -f tutorial.lg
++	rm -f tutorialli1.html
++	rm -f tutorial.log
++	rm -f tutorialse1.html
++	rm -f tutorialse2.html
++	rm -f tutorialse3.html
++	rm -f tutorialse4.html
++	rm -f tutorial.tmp
++	rm -f tutorial.xref
++

@@ -25,71 +25,21 @@
 
 BEGIN_NAMESPACE_PBORIGB
 
-#if 0
-inline Polynomial
-red_tail(const GroebnerStrategy& strat, Polynomial p){
-  Polynomial res;
-  int deg_bound=p.deg();
-  std::vector<Monomial> res_vec;
-  Polynomial orig_p=p;
-  bool changed=false;
-  if (!(p.isZero())){
-    Monomial lm=p.lead();
-    res_vec.push_back(lm);
-    p=Polynomial(p.diagram().diff(lm.diagram()));
-  }
-  while(!(p.isZero())){
-    
-    //res+=lm;
-
-    
-    //p-=lm;
-    std::vector<Monomial> irr;
-    Polynomial::const_iterator it=p.begin();
-    Polynomial::const_iterator end=p.end();
-    while((it!=end)&& (irreducible_lead(*it,strat))){
-        irr.push_back(*it);
-        it++;
-    }
-    if ((!(changed))&& (it==end)) return orig_p;
-    Polynomial irr_p=add_up_monomials(irr, p.ring().zero());
-    int s,i;
-    s=irr.size();
-    PBORI_ASSERT(s==irr_p.length());
-    //if (s!=irr_p.length()) cout<<"ADDUP FAILED!!!!!!!!!!!!!!!!!!!!!!!!\n";
-    for(i=0;i<s;i++){
-        res_vec.push_back(irr[i]);
-    }
-    
-    //p=p-irr_p;
-    p=Polynomial(p.diagram().diff(irr_p.diagram()));
-    if(p.isZero()) break;
-    //Monomial lm=p.lead();
-    //res_vec.push_back(lm);
-    
-    
-    //p=Polynomial(p.diagram().diff(lm.diagram()));
-    p=nf3(strat.generators,p);
-    changed=true;
-  }
-  
-  //should use already added irr_p's
-  res=add_up_monomials(res_vec, p.ring().zero());
-  return res;
-}
-#else
 inline Polynomial
 red_tail_general(const ReductionStrategy& strat, Polynomial p){
-  Polynomial res(p.ring().zero());
-  int deg_bound=p.deg();
+
+  PBORI_ASSERT(!p.isZero());
+
+  // int deg_bound=p.deg(); /// @todo unused?
   std::vector<Polynomial> res_vec;
   Polynomial orig_p=p;
   bool changed=false;
-  if LIKELY(!(p.isZero())){
-    Monomial lm=p.lead();
-    res_vec.push_back(lm);
-    p=Polynomial(p.diagram().diff(lm.diagram()));
-  }
+
+  // assuming non-zero
+  Monomial lm=p.lead();
+  res_vec.push_back(lm);
+  p=Polynomial(p.diagram().diff(lm.diagram()));
+
   while(!(p.isZero())){
     
     //res+=lm;
@@ -105,15 +55,15 @@ red_tail_general(const ReductionStrategy& strat, Polynomial p){
     }
     Monomial rest_lead(p.ring());
     
-    if UNLIKELY((!(changed))&& (it==end)) return orig_p;
+    if PBORI_UNLIKELY((!(changed))&& (it==end)) return orig_p;
     //@todo: if it==end irr_p=p, p=Polnomial(0)
     Polynomial irr_p(p.ring());
-    if LIKELY(it!=end) {
+    if PBORI_LIKELY(it!=end) {
       irr_p=add_up_generic(irr, p.ring().zero());
         rest_lead=*it;
         }
     else irr_p=p;
-    int s,i;
+    int s;
     s=irr.size();
     PBORI_ASSERT(s==irr_p.length());
     //if (s!=irr_p.length()) cout<<"ADDUP FAILED!!!!!!!!!!!!!!!!!!!!!!!!\n";
@@ -123,7 +73,7 @@ red_tail_general(const ReductionStrategy& strat, Polynomial p){
     res_vec.push_back(irr_p);
     //p=p-irr_p;
     p=Polynomial(p.diagram().diff(irr_p.diagram()));
-    if UNLIKELY(p.isZero()) break;
+    if PBORI_UNLIKELY(p.isZero()) break;
     //Monomial lm=p.lead();
     //res_vec.push_back(lm);
     
@@ -138,24 +88,26 @@ red_tail_general(const ReductionStrategy& strat, Polynomial p){
   }
   
   //should use already added irr_p's
-  res=add_up_polynomials(res_vec, p.ring().zero());
-  return res;
+  return add_up_polynomials(res_vec, p.ring().zero());
 }
 
 
 template <class Helper>
 inline Polynomial
 red_tail_generic(const ReductionStrategy& strat, Polynomial p){
-  Polynomial res(p.ring().zero());
-  int deg_bound=p.deg();
+
+  PBORI_ASSERT(!p.isZero());
+
+  // int deg_bound=p.deg(); /// @todo unused?
   std::vector<Polynomial> res_vec;
   Polynomial orig_p=p;
   bool changed=false;
-  if LIKELY(!(p.isZero())){
-    Monomial lm=p.lead();
-    res_vec.push_back(lm);
-    p=Polynomial(p.diagram().diff(lm.diagram()));
-  }
+
+  // assuming non-zero
+  Monomial lm = p.lead();
+  res_vec.push_back(lm);
+  p = Polynomial(p.diagram().diff(lm.diagram()));
+
   while(!(p.isZero())){
   {
       Polynomial p_bak=p;
@@ -174,7 +126,7 @@ red_tail_generic(const ReductionStrategy& strat, Polynomial p){
     //typedef  (typename Helper::iterator_type) it_type;
     //typedef  (typename it_type::value_type) mon_type;
     //Monomial mymon;
-    if LIKELY(strat.canRewrite(p)){
+    if PBORI_LIKELY(strat.canRewrite(p)){
         Polynomial irreducible_part=mod_mon_set(p.diagram(),strat.minimalLeadingTerms);
         if (!(irreducible_part.isZero())){
             res_vec.push_back(irreducible_part);
@@ -186,7 +138,7 @@ red_tail_generic(const ReductionStrategy& strat, Polynomial p){
         }
 
         while((it!=end)&& (Helper::irreducible_lead(*it,strat))){
-            if UNLIKELY(Helper::knowRestIsIrreducible(it,strat)){
+            if PBORI_UNLIKELY(Helper::knowRestIsIrreducible(it,strat)){
                 rest_is_irreducible=true;
                 break;
             } else{
@@ -200,16 +152,16 @@ red_tail_generic(const ReductionStrategy& strat, Polynomial p){
     }
     Monomial rest_lead(p.ring());
     
-    if UNLIKELY((!(changed))&& (it==end)) return orig_p;
+    if PBORI_UNLIKELY((!(changed))&& (it==end)) return orig_p;
     //@todo: if it==end irr_p=p, p=Polnomial(0)
     Polynomial irr_p(p.ring());
-    if LIKELY((it!=end) &&(!(rest_is_irreducible))) {
+    if PBORI_LIKELY((it!=end) &&(!(rest_is_irreducible))) {
       irr_p=Helper::sum_range(irr,it_orig,it, p.ring().zero());//add_up_monomials(irr);
         rest_lead=*it;
         
         }
     else irr_p=p;
-    int s,i;
+    size_t s;
     s=irr.size();
 
     PBORI_ASSERT((s==irr_p.length())||(rest_is_irreducible));
@@ -217,20 +169,21 @@ red_tail_generic(const ReductionStrategy& strat, Polynomial p){
     res_vec.push_back(irr_p);
 
     p=Polynomial(p.diagram().diff(irr_p.diagram()));
-    if UNLIKELY(p.isZero()) break;
+    if PBORI_UNLIKELY(p.isZero()) break;
     p=Helper::nf(strat,p,rest_lead);
     changed=true;
   }
   
   //should use already added irr_p's
-  res=add_up_polynomials(res_vec, p.ring().zero());
-  return res;
+  return add_up_polynomials(res_vec, p.ring().zero());
 }
 
 
 
 inline Polynomial
 red_tail(const ReductionStrategy& strat, Polynomial p){
+  if PBORI_UNLIKELY(p.isZero()) return p;
+
   if (p.ring().ordering().isLexicographical())
     return red_tail_generic<LexHelper>(strat,p);
   if (p.ring().ordering().isDegreeOrder())
@@ -239,7 +192,6 @@ red_tail(const ReductionStrategy& strat, Polynomial p){
     return red_tail_generic<BlockOrderHelper>(strat,p);
   return red_tail_general(strat,p);
 }
-#endif
 
 inline Polynomial
 red_tail_short(const ReductionStrategy& strat, Polynomial p){

@@ -160,21 +160,9 @@ BoolePolynomial&
 BoolePolynomial::operator/=(const monom_type& rhs) {
 
   PBORI_TRACE_FUNC( "BoolePolynomial::operator/=(const monom_type&)" );
-
-
-
-  typedef CCacheManagement<ring_type, CCacheTypes::divide>
-    cache_mgr_type;
-
-  self result = dd_divide_recursively(cache_mgr_type(ring()), 
-                                      navigation(),
-                                      rhs.diagram().navigation(),
-                                      self(ring()));
-
-//   m_dd.divideFirstAssign(rhs.diagram());
-//   PBORI_ASSERT(*this == result);
-  return (*this = result);
+  return (*this = m_dd.divide(rhs));
 }
+
 // Division
 BoolePolynomial&
 BoolePolynomial::operator/=(const exp_type& rhs) {
@@ -193,7 +181,7 @@ BoolePolynomial&
 BoolePolynomial::operator/=(const self& rhs) {
 
   PBORI_TRACE_FUNC( "BoolePolynomial::operator/=(const self&)" );
-  if UNLIKELY(rhs.isZero()) {
+  if PBORI_UNLIKELY(rhs.isZero()) {
     throw PBoRiGenericError<CTypes::division_by_zero>();
   }
   return operator/=(rhs.firstTerm());
@@ -203,7 +191,7 @@ BoolePolynomial&
 BoolePolynomial::operator/=(constant_type rhs) {
 
   PBORI_TRACE_FUNC( "BoolePolynomial::operator/=(constant_type)" );
-  if UNLIKELY(!rhs) {
+  if PBORI_UNLIKELY(!rhs) {
     throw PBoRiGenericError<CTypes::division_by_zero>();
   }
   return *this;
@@ -237,7 +225,7 @@ BoolePolynomial::monom_type
 BoolePolynomial::lead() const {
 
   PBORI_TRACE_FUNC( "BoolePolynomial::lead() const" );
-  //if UNLIKELY(isZero())
+  //if PBORI_UNLIKELY(isZero())
   //  throw PBoRiGenericError<CTypes::illegal_on_zero>();
   
   return ring().ordering().lead(*this);
@@ -248,7 +236,7 @@ BoolePolynomial::monom_type
 BoolePolynomial::lexLead() const {
 
   PBORI_TRACE_FUNC( "BoolePolynomial::lexLead() const" );
-  //if UNLIKELY(isZero())
+  //if PBORI_UNLIKELY(isZero())
   //  throw PBoRiGenericError<CTypes::illegal_on_zero>();
 
   return LexOrder().lead(*this);
@@ -259,7 +247,7 @@ BoolePolynomial::monom_type
 BoolePolynomial::boundedLead(deg_type bound) const {
 
   PBORI_TRACE_FUNC( "BoolePolynomial::lead(deg_type) const" );
-  //if UNLIKELY(isZero()) 
+  //if PBORI_UNLIKELY(isZero()) 
   //  throw PBoRiGenericError<CTypes::illegal_on_zero>();
 
   return ring().ordering().lead(*this, bound);
@@ -270,7 +258,7 @@ BoolePolynomial::exp_type
 BoolePolynomial::leadExp() const {
 
   PBORI_TRACE_FUNC( "BoolePolynomial::leadExp() const" );
-  //if UNLIKELY(isZero())
+  //if PBORI_UNLIKELY(isZero())
   //  throw PBoRiGenericError<CTypes::illegal_on_zero>();
 
   return ring().ordering().leadExp(*this);
@@ -281,7 +269,7 @@ BoolePolynomial::exp_type
 BoolePolynomial::boundedLeadExp(deg_type bound) const {
 
   PBORI_TRACE_FUNC( "BoolePolynomial::leadExp(deg_type) const" );
-  //if UNLIKELY(isZero())
+  //if PBORI_UNLIKELY(isZero())
   //  throw PBoRiGenericError<CTypes::illegal_on_zero>();
 
   return ring().ordering().leadExp(*this, bound);
@@ -329,7 +317,7 @@ BoolePolynomial::deg_type
 BoolePolynomial::leadDeg() const {
 
   PBORI_TRACE_FUNC( "BoolePolynomial::leadDeg() const" );
-  if (UNLIKELY(isZero())) return -1;
+  if (PBORI_UNLIKELY(isZero())) return -1;
 #ifndef PBORI_USE_CCUDDFIRSTITER
   // Equals number of nodes for monomials
   return lead().nNodes();
@@ -346,7 +334,7 @@ BoolePolynomial::deg_type
 BoolePolynomial::lexLeadDeg() const {
 
   PBORI_TRACE_FUNC( "BoolePolynomial::lexLeadDeg() const" );
-  if (UNLIKELY(isZero())) return -1;
+  if (PBORI_UNLIKELY(isZero())) return -1;
   return std::distance(firstBegin(), firstEnd());
 }
 
@@ -803,7 +791,7 @@ BoolePolynomial::eliminationLength() const{
     return 0;
   if (ring().ordering().isTotalDegreeOrder())
     return this->length();
-  size_type deg=this->deg();
+  deg_type deg=this->deg();
   if (deg==this->leadDeg()){
     return this->length();
   }

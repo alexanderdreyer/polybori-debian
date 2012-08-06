@@ -1,3 +1,27 @@
+Release Name: 0.8.2
+* Dependencies of optional rpm package gui fixed
+* Fixed bug which prevented self-testing of polybori.plot
+* Build systems uses as few libs as possible for linking
+* Explicit name lookup of attributes from template base
+* Preprocessor misconception fixed (#if vs. #ifdef)
+* polybori.gbcore drops assumption ideal were a list (still assuming iteratable)
+* png generation via libm4ri (alternative to libgb)
+
+Release Name: 0.8.1
+* fallback m4ri updated to release 20111203
+* Merged Cudd with cudd 2.5.0
+* Prefixed patched Cudd's function with pbori_
+* ipbori is now an all-python script with fallback to plain python if
+  IPython is not available
+* Python interface utilizes shared libraries
+* PolyBoRi's shared libraries are found via relative rpath 
+  (relative install-name on Darwin)
+* introducing DEFAULT_*FLAGS
+* Install/InstallAs fixes permissions
+* ipbori -t runs PolyBoRi's doctests	
+* internal refactoring of ReductionStrategy and GroebnerStrategy started
+* avoiding long long
+
 Release Name: 0.8.0
 * improved standard-conformity, multiprocessing safety, and usability
 * renamed subdirectory polybori to libpolybori

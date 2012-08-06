@@ -19,13 +19,13 @@
 // include definitions
 #include "groebner_defs.h"
 #include "contained_variables.h"
-#include "nf.h"
+//#include "nf.h"
 
 #include <vector>
 #include <algorithm>
 
 BEGIN_NAMESPACE_PBORIGB
-
+MonomialSet mod_mon_set(const MonomialSet& as, const MonomialSet &vs); // nf.cc
 MonomialSet mod_deg2_set(const MonomialSet& as, const MonomialSet &vs);  // groebner_alg.cc
 MonomialSet mod_var_set(const MonomialSet& as, const MonomialSet& vs);   // groebner_alg.cc
 
@@ -78,7 +78,7 @@ minimal_elements_internal2(MonomialSet s){
         return s;
     } else {
     
-        int z;
+        MonomialSet::size_type z;
         MonomialSet cv_set(s.ring());
         for(z=cv.size()-1;z>=0;z--){
             Monomial mv=Variable(cv[z], s.ring());
@@ -139,8 +139,7 @@ minimal_elements_internal3(MonomialSet s){
         return result;
     }
     std::vector<idx_type> cv=contained_variables(s);
-    int i;
-    for(i=0;i<cv.size();i++){
+    for(MonomialSet::size_type i=0;i<cv.size();i++){
             s=s.subset0(cv[i]);
             Exponent t;
             t.insert(cv[i]);
@@ -155,7 +154,7 @@ minimal_elements_internal3(MonomialSet s){
         exponents.insert(exponents.end(), s.expBegin(),s.expEnd());
         int nvars=s.ring().nVariables();
         std::vector<std::vector<int> > occ_vecs(nvars);
-        for(i=0;i<exponents.size()-1;i++){
+        for(MonomialSet::size_type i=0;i<exponents.size()-1;i++){
             Exponent::const_iterator it=((const Exponent&) exponents[i]).begin();
             Exponent::const_iterator end=((const Exponent&) exponents[i]).end();
             while(it!=end){
@@ -169,13 +168,12 @@ minimal_elements_internal3(MonomialSet s){
             occ_sets[i].insert(occ_vecs[i].begin(),occ_vecs[i].end());
         }*/
         std::vector<bool> still_minimal(exponents.size());
-        for(i=exponents.size()-1;i>=0;i--){
+        for(MonomialSet::size_type i=exponents.size()-1;i>=0;i--){
             still_minimal[i]=true;
         }
-        int result_orig=result.size();
-        //cout<<"orig:"<<exponents.size()<<endl;
+
         //lex smalles is last so backwards
-        for(i=exponents.size()-1;i>=0;i--){
+        for(MonomialSet::size_type i=exponents.size()-1;i>=0;i--){
             if (still_minimal[i]){
                 //we assume, that each exponents has deg>0
                 Exponent::const_iterator it=((const Exponent&) exponents[i]).begin();
@@ -218,7 +216,6 @@ minimal_elements_internal3(MonomialSet s){
                 result.push_back(exponents[i]);
             }
         }
-        //cout<<"after:"<<result.size()-result_orig<<endl;
         
     }
     return result;
@@ -391,103 +388,67 @@ minimal_elements_cudd_style(MonomialSet m){
 
 
 
-#define EXP_FOR_PAIRS
-#ifndef EXP_FOR_PAIRS
-inline
-std::vector<Monomial> minimal_elements_multiplied(MonomialSet m, Monomial lm){
-  
-  
-    std::vector<Monomial> result;
-    if (!(m.divisorsOf(lm).isZero())){
-        result.push_back(lm);
-    } else {
-        Monomial v;
-        //lm austeilen
-        m=divide_monomial_divisors_out(m,lm);
-        
-        //std::vector<idx_type> cv=contained_variables(m);
-        //int i;
-        /*for(i=0;i<cv.size();i++){
-            result.push_back(((Monomial)Variable(cv[i]))*lm);
-            m=m.subset0(cv[i]);
-        }*/
-        m=minimal_elements(m);
-        if (!(m.isZero())){
-            m=m.unateProduct(lm.diagram());
-            result.insert(result.end(), m.begin(), m.end());
-        }
-        
-        
-    }
-    return result;
 
-}
-#else
-#if 0
-inline void
-minimal_elements_divided(MonomialSet m, Monomial lm, std::vector<Exponent>& result){
+inline MonomialSet
+minimal_elements_multiplied_monoms(MonomialSet m, Monomial lm){
+  
+    if (m.divisorsOf(lm).isZero()){
+       m = m.existAbstract(lm);
+       m = minimal_elements_cudd_style_unary(m);
 
-    Exponent exp;//=lm.exp();
-    if (!(m.divisorsOf(lm).isZero())){
-        result.push_back(exp);
-    } else {
-        Monomial v;
-        
-        m=divide_monomial_divisors_out(m,lm);
-        
-        
-        return minimal_elements_internal3(m);
-        
+       return m.unateProduct(lm.set());
     }
-    return result;
+    return lm.set() ;
 }
-#else
+
+inline std::vector<Monomial>
+minimal_elements_multiplied(MonomialSet m, Monomial lm){ 
+
+  MonomialSet result = minimal_elements_multiplied_monoms(m, lm);
+  return std::vector<Monomial>(result.begin(), result.end());
+}
+  
+
+
 //#define MIN_ELEMENTS_BINARY 1
 #ifdef MIN_ELEMENTS_BINARY
-inline void
-minimal_elements_divided(MonomialSet m, Monomial lm, MonomialSet mod, std::vector<Exponent>& result){
+inline MonomialSet
+minimal_elements_divided(MonomialSet m, Monomial lm, MonomialSet mod){
 
-    Exponent exp;//=lm.exp();
-    if (!(m.divisorsOf(lm).isZero())){
-        result.push_back(exp);
-    } else {
-        Monomial v;
+    if (m.divisorsOf(lm).isZero()){
         m=divide_monomial_divisors_out(m,lm);
         //mod=divide_monomial_divisors_out(mod,lm);
-        m=do_minimal_elements_cudd_style(m,mod);
-        result.resize(m.length());
-        std::copy(m.expBegin(),m.expEnd(),result.begin());
-        //return minimal_elements_internal3(m);
-        
+        return do_minimal_elements_cudd_style(m,mod);
     }
+    return m.ring().one();
 }
+
+
 #else
 
-inline void
-minimal_elements_divided(MonomialSet m, Monomial lm, MonomialSet mod, std::vector<Exponent>& result){
+inline MonomialSet
+minimal_elements_divided(MonomialSet m, Monomial lm, MonomialSet mod){
 
-    Exponent exp;//=lm.exp();
-    if (!(m.divisorsOf(lm).isZero())){
-        result.push_back(exp);
-    } else {
+    if (m.divisorsOf(lm).isZero()){
 
         m=m.existAbstract(lm);
         mod=mod.existAbstract(lm);
         //mod=divide_monomial_divisors_out(mod,lm);
         m=mod_mon_set(m,mod);
-        m=minimal_elements_cudd_style_unary(m);
-        result.resize(m.length());
-        std::copy(m.expBegin(),m.expEnd(),result.begin());
- 
-        
-    }
 
+        return minimal_elements_cudd_style_unary(m);
+    }
+    return m.ring().one();
 }
 #endif
 
-
-#endif
-#endif
+inline void
+minimal_elements_divided(MonomialSet m, Monomial lm, MonomialSet mod,
+                         std::vector<Exponent>& result){
+  MonomialSet elements = minimal_elements_divided(m, lm, mod);
+  result.resize(elements.length());
+  std::copy(elements.expBegin(), elements.expEnd(), result.begin());
+}
 
 
 END_NAMESPACE_PBORIGB

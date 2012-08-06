@@ -100,8 +100,8 @@ cd $BUILDDIR
 
 scons distribute USE_TIMESTAMP=no $@
 
-scons prepare-rpm $@
 scons srpm $@
+scons prepare-rpm M4RI_RPM=True $@
 
 TARBALL=`ls *tar.gz`
 rm -rf $RELEASE_DIR
@@ -134,7 +134,8 @@ tar -xvzf $tardebian
 cd polybori-*
 
 scons prepare-debian
-rm -rf .scon* *.pyc
+scons -c M4RI
+rm -rf .scon* *.pyc config.log
 
 cd -
 dpkg-source -b polybori-*  $tardebian || exit 1

@@ -22,7 +22,7 @@
 
   Author      [Fabio Somenzi]
 
-  Copyright   [Copyright (c) 1995-2004, Regents of the University of Colorado
+  Copyright   [Copyright (c) 1995-2012, Regents of the University of Colorado
 
   All rights reserved.
 
@@ -59,10 +59,14 @@
 #include "util.h"
 #include "cuddInt.h"
 
+#ifndef PBORI_FORCE_ORIGINAL_CUDD
+#include <polybori/cudd/prefix_internal.h>
+#endif
+
 /*---------------------------------------------------------------------------*/
 /* Constant declarations                                                     */
 /*---------------------------------------------------------------------------*/
-#ifndef CUDD_ORIG_INCLUSION
+#ifndef PBORI_FORCE_ORIGINAL_CUDD
 void (*MMoutOfMemory)(long) = MMout_of_memory;
 /* MMout_of_memory -- out of memory for lazy people, flush and exit */
 
@@ -84,7 +88,7 @@ void (*MMoutOfMemory)(long) = MMout_of_memory;
 /*---------------------------------------------------------------------------*/
 
 #ifndef lint
-static char rcsid[] DD_UNUSED = "$Id$";
+static char rcsid[] DD_UNUSED = "$Id: cuddInit.c,v 1.34 2012/02/05 01:07:19 fabio Exp $";
 #endif
 
 /*---------------------------------------------------------------------------*/
@@ -144,8 +148,8 @@ Cudd_Init(
     looseUpTo = (unsigned int) ((maxMemory / sizeof(DdNode)) /
 				DD_MAX_LOOSE_FRACTION);
     unique = cuddInitTable(numVars,numVarsZ,numSlots,looseUpTo);
-    unique->maxmem = (unsigned long) maxMemory / 10 * 9;
     if (unique == NULL) return(NULL);
+    unique->maxmem = (unsigned long) maxMemory / 10 * 9;
     maxCacheSize = (unsigned int) ((maxMemory / sizeof(DdCache)) /
 				   DD_MAX_CACHE_FRACTION);
 

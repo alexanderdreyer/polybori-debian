@@ -50,10 +50,16 @@ If might also be useful to add some custom setting to the file 'custom.py' in
 the build directory, see the following example.
 
 --- custom.py ---
+# User variables
 CFLAGS = ""
 CCFLAGS = "-g -O3  -ansi --pedantic -Wno-long-long -pg"
 CXXFLAGS = "$CCFLAGS -ftemplate-depth-100"
 LINKFLAGS=" -Xlinker -export-dynamic -pthread -ldl  -pg" 
+
+# DEFAULT_<flags> will be appended by default. State the default flags
+# explicitely, if you want to append flags afterwards, e.g.
+LINKFLAGS='-Ddef1 $$DEFAULT_LINKFLAGS -Ddef2'
+
 # See also SHCFLAGS, SHCCFLAGS, SHCXXFLAGS, and SHLINKFLAGS
 
 LIBS=["util"]
@@ -144,13 +150,16 @@ are compatible with the stlport4 option.
 
 cygwin
 ======
-In the main directory generate a file custom.py with the following context:
+In the main directory generate a file custom.py with the following content:
 
 BOOST_PYTHON = 'boost_python-mt'
 BOOST_TEST = 'boost_unit_test_framework-mt'
 HAVE_L2H = False
 HAVE_HEVEA = False
 HAVE_TEX4HT = False
+DEFAULT_LINKFLAGS=[]
+SHLIBVERSIONING=False
+DEVEL_LIB_PREFIX = '$EPREFIX' # dlls needs to be placed here?
 
 ====================
 See also: Singular/README

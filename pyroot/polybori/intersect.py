@@ -15,8 +15,10 @@ def intersect(i,j,**gb_opts):
     This functions intersects two ideals. The first ring variable is used as helper variable for this
     intersection. It is assumed, that it doesn't occur in the ideals, and that we have an elimination ordering
     for this variables. Both assumptions are checked.
-    >>> from polybori.PyPolyBoRi import Ring
-    >>> r=declare_ring(Block["x", 1000], globals())
+    >>> from polybori.frontend import declare_ring
+    >>> from polybori import Block
+    >>> r=declare_ring(Block("x", 1000), globals())
+    >>> x = r.variable
     >>> intersect([x(1),x(2)+1],[x(1),x(2)])
     [x(1)]
     """
@@ -24,7 +26,7 @@ def intersect(i,j,**gb_opts):
         return []
     
     uv=used_vars_set(i)*used_vars_set(j)
-    t = i.ring().variable(0)
+    t = iter(i).next().ring().variable(0)
     if uv.reducible_by(t):
         raise ValueError, "First ring variable has to be reserved as helper variable t"
     if not t>uv:

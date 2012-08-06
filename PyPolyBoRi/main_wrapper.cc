@@ -16,10 +16,10 @@
 #include "out_helper.h"
 #include "test_util.h"
 #include "fglm_wrapper.h"
-#ifdef HAVE_NTL
+#ifdef PBORI_HAVE_NTL
 #include "ntl_wrapper.h"
 #endif
-#ifdef HAVE_M4RI
+#ifdef PBORI_HAVE_M4RI
 #define PACKED 1
 extern "C"{
 #include <m4ri/m4ri.h>
@@ -109,7 +109,7 @@ void export_main() {
   BoolePolyRing r(10);
   BooleMonomial monom(r);
 
-  #ifdef HAVE_M4RI
+  #ifdef PBORI_HAVE_M4RI
   m4ri_build_all_codes();
   //m4ri_init();
   //setupPackingMasks();
@@ -126,7 +126,7 @@ void export_main() {
   export_poly();
   export_nav();
   export_test_util();
-  #ifdef HANVE_NTL
+  #ifdef PBORI_HAVE_NTL
   export_ntl();
   #endif
   enum_<COrderEnums::ordercodes>("OrderCode")
@@ -159,6 +159,7 @@ void export_main() {
     .def("variable", &BoolePolyRing::variable, "i-th ring Variable")
     .def("one", ring_one, "Polynomial one")
     .def("zero", ring_zero, "Polynomial zero")
+    .def(boost::python::init <int>())
     .def(boost::python::init <BoolePolyRing::size_type>())
     .def("clone", &BoolePolyRing::clone, "copies also variable name vector in a \
     new one, so somewhat deeper copy function")

@@ -19,72 +19,87 @@
 // include basic definitions
 #include "groebner_defs.h"
 #include "polynomial_properties.h"
-#include "PairManager.h"
+#include "PolyEntryVector.h"
+#include "ReductionOptions.h"
+#include "ReductionTerms.h"
+#include "SetAssociatedMinimal.h"
 
 BEGIN_NAMESPACE_PBORIGB
-
-typedef Monomial::idx_map_type lm2Index_map_type;
-typedef Exponent::idx_map_type exp2Index_map_type;
 
 /** @class ReductionStrategy
  * @brief This class defines ReductionStrategy.
  *
  **/
-class ReductionStrategy:public PolyEntryVector{
+
+class ReductionStrategy:
+  public PolyEntryVector, public ReductionOptions, public ReductionTerms {
+  typedef ReductionStrategy self;
 public:
-    MonomialSet leadingTerms;
-    MonomialSet minimalLeadingTerms;
-    MonomialSet leadingTerms11;
-    MonomialSet leadingTerms00;
-    MonomialSet llReductor;
-    MonomialSet monomials;
-    MonomialSet monomials_plus_one;
-    lm2Index_map_type lm2Index;
-    exp2Index_map_type exp2Index;
-    bool optBrutalReductions;
-    
-    bool optLL;
 
-    Polynomial nf(Polynomial p) const;
-    bool optRedTailDegGrowth;
-    bool optRedTail;
-    idx_type reducibleUntil;
-    void setupSetsForLastElement();
+    ReductionStrategy(const BoolePolyRing& ring):
+      PolyEntryVector(), ReductionOptions(),
+      ReductionTerms(ring)  { }
 
-    // ReductionStrategy(){ set_defaults(); }
-
-    ReductionStrategy(const BoolePolyRing& theRing):
-      leadingTerms(theRing.zero()), minimalLeadingTerms(theRing.zero()),
-      leadingTerms11(theRing.zero()), leadingTerms00(theRing.zero()), llReductor(theRing.zero()),
-      monomials(theRing.zero()), monomials_plus_one(theRing.zero()), lm2Index(),
-      exp2Index() {
-      set_defaults(); 
+    /// Adding next element
+    void addGenerator(const PolyEntry& entry) {
+      PolyEntryVector::append(entry);
+      setupSetsForElement(back());
     }
 
-    bool canRewrite(const Polynomial& p) const{
-        return is_rewriteable(p,minimalLeadingTerms);
+    /// Adding next generator
+    /// @note overwriting virtual to avoid inconsistency when casting
+    void append(const PolyEntry& entry) { addGenerator(entry); }
+
+    Polynomial nf(const Polynomial& p) const {
+      return (optRedTail? reducedNormalForm(p): headNormalForm(p));
     }
-    void addGenerator(const Polynomial& p){
-        push_back(p);
-        setupSetsForLastElement();
+
+    bool canRewrite(const Polynomial& p) const {
+      return is_rewriteable(p, minimalLeadingTerms);
     }
+
     int select1(const Polynomial& p) const;
     int select1(const Monomial& m) const;
 
-    int select_short(const Polynomial& p) const;
-    int select_short(const Monomial& m) const;
-    Polynomial headNormalForm(Polynomial p) const;
-    
-    Polynomial reducedNormalForm(Polynomial p) const;
-
- protected:
-    void set_defaults(){
-        optLL=false;
-        reducibleUntil=-1;
-        optBrutalReductions=true;
-        optRedTail=true;
-        optRedTailDegGrowth=true;
+    int select_short(const Polynomial& p) const {
+      return select_short_by_terms(p.leadDivisors());
     }
+    int select_short(const Monomial& m) const {
+      return select_short_by_terms(m.divisors());
+    }
+
+    Polynomial headNormalForm(const Polynomial& p) const;
+    Polynomial reducedNormalForm(const Polynomial& p) const;
+
+    void llReduceAll();
+
+    operator const PolyEntryVector&() const {
+      return static_cast<const PolyEntryVector&>(*this);
+    }
+
+protected:
+  void llReduce(const PolyEntry& entry, const Exponent& ll_e);
+
+  int select_short_by_terms(const MonomialSet&) const;
+
+  void unmarkNonMinimalLeadingTerms(MonomialSet removed) {
+    std::for_each(removed.expBegin(), removed.expEnd(),
+		  SetAssociatedMinimal<Exponent, false>(*this));
+  }
+ 
+  void setupSetsForElement(const PolyEntry& entry);
+
+
+  template <class Iterator, class CompareType>
+  size_type minimum(Iterator start, Iterator finish, const CompareType& comp)
+    const {
+    start = std::min_element(start, finish, comp);
+    if PBORI_UNLIKELY(start == finish)
+      return size_type(-1);
+    
+    return index(*start);
+  }
+
 };
 
 

@@ -24,7 +24,7 @@ def pkey(p):
     return (p[0],len(p))
 mat_counter=0
 def build_and_print_matrices(v,strat):
-    """"old solution using PIL, the currently used implementation is done in C++
+    """old solution using PIL, the currently used implementation is done in C++
     and plots the same matrices, as being calculated"""
     treated=BooleSet()
     v=list(v)
@@ -640,7 +640,7 @@ def normal_form(poly, ideal, reduced=True):
         if p.lead()!=last:
             strat.add_generator(p)
         else:
-            warn("%s will not used for reductions", p )
+            warn("%s will not used for reductions"% p )
         last=p.lead()
     return strat.nf(poly)
 

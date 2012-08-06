@@ -37,12 +37,12 @@ public:
     this->j=j;
   }
   bool operator() (int i){
-      PolyEntry & e1=strat->generators[i];
-      PolyEntry & e2=strat->generators[j];
+    const PolyEntry & e1=const_cast<const GroebnerStrategy*>(strat)->generators[i];
+      const PolyEntry & e2=const_cast<const GroebnerStrategy*>(strat)->generators[j];
       const int USED_VARIABLES_BOUND=6;
       if ((e1.usedVariables.deg()>USED_VARIABLES_BOUND)||
           (e2.usedVariables.deg()>USED_VARIABLES_BOUND)||
-          (e1.usedVariables.LCMDeg(e2.usedVariables)>USED_VARIABLES_BOUND)
+          (e1.usedVariables.LCMDeg(e2.usedVariables) > USED_VARIABLES_BOUND)
           
           
           ||(e1.p.set().nNodes()>30)||(e2.p.set().nNodes()>30))
@@ -50,7 +50,7 @@ public:
 
       Exponent uv_exp=e1.usedVariables.LCM(e2.usedVariables);
 
-      MonomialSet space=uv_exp.divisors(strat->r);
+      MonomialSet space=uv_exp.divisors(e1.p.ring());
       
       Monomial lead_lcm=e1.lead.LCM(e2.lead);
       //I am sure, there exists combinatorial formulas
@@ -65,7 +65,8 @@ public:
       )-1)
       +((1<<gcd_deg)-1)*((1<<(e1.leadDeg-gcd_deg))+(1<<(e2.leadDeg-gcd_deg)));
 
-      int standard_monomials= (standard_monomials_in_common_lead <<(uv_exp.size()-lead_lcm.deg()));
+      MonomialSet::size_type standard_monomials =
+        (standard_monomials_in_common_lead <<(uv_exp.size()-lead_lcm.deg()));
       
       MonomialSet zeros1=zeros(e1.p, space);
       MonomialSet zeros2=zeros(e2.p, space);
@@ -76,7 +77,7 @@ public:
       // MonomialSet my_zeros=zeros(e1.p, space).intersect(zeros(e2.p, space));
       
       
-      if (UNLIKELY(standard_monomials==my_zeros.size()))
+      if (PBORI_UNLIKELY(standard_monomials==my_zeros.size()))
       {
           strat->pairs.status.setToHasTRep(i,j);
           return true;
@@ -86,8 +87,7 @@ public:
           return false;
   }
   bool operator() (const Exponent &m){
-    int i;
-    i=strat->generators.exp2Index[m];
+    int i = strat->generators.index(m);
     return (*this)(i);
   }
 

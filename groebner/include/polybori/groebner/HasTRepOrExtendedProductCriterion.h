@@ -48,13 +48,12 @@ public:
     this->j=j;
   }
   bool operator() (const Monomial &m){
-    int i;
-    i=strat->generators.lm2Index[m];
+    int i = strat->generators.index(m);
     
     if (strat->pairs.status.hasTRep(i,j))
       return true;
     
-    if (extended_product_criterion(strat->generators[i],strat->generators[j])){
+    if (extended_product_criterion(const_cast<const GroebnerStrategy*>(strat)->generators[i],const_cast<const GroebnerStrategy*>(strat)->generators[j])){
       strat->pairs.status.setToHasTRep(i,j);
       strat->extendedProductCriterions++;
       return true;
@@ -63,12 +62,12 @@ public:
   }
   bool operator() (const Exponent &m){
     int i;
-    i=strat->generators.exp2Index[m];
+    i=strat->generators.index(m);
     
     if (strat->pairs.status.hasTRep(i,j))
       return true;
     
-    if (extended_product_criterion(strat->generators[i],strat->generators[j])){
+    if (extended_product_criterion(const_cast<const GroebnerStrategy*>(strat)->generators[i],const_cast<const GroebnerStrategy*>(strat)->generators[j])){
       strat->pairs.status.setToHasTRep(i,j);
       strat->extendedProductCriterions++;
       return true;

@@ -16,58 +16,65 @@
 #ifndef polybori_groebner_PolyEntry_h_
 #define polybori_groebner_PolyEntry_h_
 
+#include "LiteralFactorization.h"
+#include "PolyEntryBase.h"
+
 // include basic definitions
 #include "groebner_defs.h"
 
-#include "LiteralFactorization.h"
-
 BEGIN_NAMESPACE_PBORIGB
+
 
 /** @class PolyEntry
  * @brief This class defines PolyEntry.
  *
  **/
-class PolyEntry{
-   PolyEntry();                 /* never use this one! */
-public:
-  PolyEntry(const Polynomial &p);
+class PolyEntry:
+  public PolyEntryBase {
+  PolyEntry();                 /* never use this one! */
 
-  bool operator==(const PolyEntry& other) const{
-      return p==other.p;
+  typedef PolyEntry self;
+  typedef PolyEntryBase base;
+
+public:
+  PolyEntry(const Polynomial &p): base(p) {}
+
+  bool operator==(const self& other) const { return p == other.p; }
+
+  self& operator=(const self& rhs) {
+    return static_cast<self&>(base::operator=(rhs));
   }
-  LiteralFactorization literal_factors;
-  Polynomial p;
-  Monomial lead;
-  wlen_type weightedLength;
-  len_type length;
-  deg_type deg;
-  deg_type leadDeg;
-  Exponent leadExp;
-  Monomial gcdOfTerms;
-  Exponent usedVariables;
-  Exponent tailVariables;
-  Polynomial tail;
-  ///set of variables with which pair was calculated
-  std::set<idx_type> vPairCalculated; 
-  deg_type ecart() const{
-    return deg-leadDeg;
+
+  self& operator=(const Polynomial& rhs) {
+    p = rhs;
+    recomputeInformation();
+    return *this;
   }
-  bool minimal;
+
+  deg_type ecart() const{ return deg-leadDeg; }
+
   void recomputeInformation();
 
   void markVariablePairsCalculated() {
-    Exponent::const_iterator it(leadExp.begin()), end(leadExp.end());
-    while(it != end){
-      vPairCalculated.insert(*it);
-      it++;
-    } 
+    vPairCalculated.insert(leadExp.begin(), leadExp.end());
   }
+
+  bool propagatableBy(const PolyEntry& other) const {
+    return minimal && (deg <= 2) && (length > 1) && (p != other.p) &&
+      tailVariables.reducibleBy(other.leadExp);
+  }
+
+  bool isSingleton() const { return length == 1; }
 };
+
+
+
 
 
 inline bool
 should_propagate(const PolyEntry& e){
- return ((((e.length==1) && (e.deg>0) && (e.deg<4)))||((e.length==2)&&(e.ecart()==0) &&(e.deg<3)));
+  return ( (e.length == 1) && (e.deg > 0) && (e.deg < 4) ) ||
+    ( (e.length == 2) && (e.ecart() == 0) && (e.deg < 3) );
 
 }
 

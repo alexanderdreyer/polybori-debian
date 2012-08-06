@@ -40,24 +40,24 @@ BEGIN_NAMESPACE_PBORIGB
 
 
 
-static int log2_floor(int n){
-    int i;
-    for(i=0;__M4RI_TWOPOW(i)<=n;i++){}
-    return i-1;
-}
-static int optimal_k_for_multiplication(int a,int b,int c,const GroebnerStrategy& strat){
-    int res=std::min(M4RI_MAXKAY,std::max(1,log2_floor(b)));
-    if UNLIKELY(strat.enabledLog)
-        std::cout<<"optimal k for multiplication:"<<res<<std::endl;
-    return res;
-}
-static int optimal_k_for_gauss(int m, int n, const GroebnerStrategy& strat){
-    int l=std::min(n,m);
-    int res=std::min(M4RI_MAXKAY,std::max(1,log2_floor(l)+1-log2_floor(log2_floor(l))));
-    if UNLIKELY(strat.enabledLog)
-        std::cout<<"optimal k for gauss:"<<res<<std::endl;
-    return res;
-}
+// static int log2_floor(int n){
+//   unsigned i = 0;
+//   for(;__M4RI_TWOPOW(i)<=(unsigned)n;i++){}
+//     return i-1;
+// }
+// static int optimal_k_for_multiplication(int a,int b,int c,const GroebnerStrategy& strat){
+//     int res=std::min(M4RI_MAXKAY,std::max(1,log2_floor(b)));
+//     if PBORI_UNLIKELY(strat.enabledLog)
+//         std::cout<<"optimal k for multiplication:"<<res<<std::endl;
+//     return res;
+// }
+// static int optimal_k_for_gauss(int m, int n, const GroebnerStrategy& strat){
+//     int l=std::min(n,m);
+//     int res=std::min(M4RI_MAXKAY,std::max(1,log2_floor(l)+1-log2_floor(log2_floor(l))));
+//     if PBORI_UNLIKELY(strat.enabledLog)
+//         std::cout<<"optimal k for gauss:"<<res<<std::endl;
+//     return res;
+// }
 
 
 
@@ -238,30 +238,25 @@ const int FARE_WORSE=10;
 //   return p;
 // }
 
-static Polynomial exchange(GroebnerStrategy& strat , int i, const Polynomial & p){
-  PBORI_ASSERT(p.lead()==strat.generators[i].lead);
-  PolyEntry e(p);
-  e.vPairCalculated=strat.generators[i].vPairCalculated;
-  Polynomial res=spoly(strat.generators[i].p,p);
-  strat.generators[i]=e;
+// static Polynomial exchange(GroebnerStrategy& strat , int i, const Polynomial & p){
+//   PBORI_ASSERT(p.lead() == strat.generators[i].lead);
+//   PolyEntry e(p);
 
-  PBORI_ASSERT(p.ring().id() == strat.r.id());
-  PBORI_ASSERT(e.lead.ring().id() == strat.r.id());
-  PBORI_ASSERT(e.p.ring().id() == strat.r.id());
+//   e.vPairCalculated=strat.generators[i].vPairCalculated;
+//   Polynomial res=spoly(strat.generators[i].p,p);
+//   strat.generators.exchange(i, e);
 
-
-  return res;
-}
+//   return res;
+// }
 
 static Polynomial exchange_with_promise(GroebnerStrategy& strat , int i, const Polynomial & p){
   PBORI_ASSERT(p.lead()==strat.generators[i].lead);
-  PBORI_ASSERT(p.ring().id() == strat.r.id());
+
   //PolyEntry e(p);
   //e.vPairCalculated=strat.generators[i].vPairCalculated;
-  bool minimal=strat.generators[i].minimal;
   Polynomial res=strat.generators[i].p;
-  strat.generators[i].p=p;
-  strat.generators[i].recomputeInformation();
+  strat.generators.exchange(i,p);
+
   //strat.generators[i].minimal=false;
   
   if ((strat.generators[i].minimal)&&(strat.generators[i].length==2))
@@ -415,7 +410,7 @@ static void step_S_T(std::vector<PolynomialSugar>& curr, std::vector<Polynomial>
     }
   }
   
-  Polynomial pivot(strat.r);
+  Polynomial pivot(lm.ring());
   if (pivot_el<strat.generators[index].weightedLength){
     
     pivot_el=curr[found].eliminationLength();
@@ -461,11 +456,11 @@ static void step_S_T(std::vector<PolynomialSugar>& curr, std::vector<Polynomial>
 
 static void step_T_simple(std::vector<PolynomialSugar>& curr, std::vector<Polynomial>& result,  const BooleMonomial& lm,GroebnerStrategy& strat){
   int s=curr.size();
-  Polynomial reductor(strat.r);
+  Polynomial reductor(lm.ring());
   int found;
   wlen_type pivot_el;
   found=0;
-  pivot_el=curr[0].eliminationLength();
+           pivot_el=curr[0].eliminationLength();
   int i;
   for (i=1;i<s;i++){
     wlen_type comp=curr[i].eliminationLength();
@@ -522,77 +517,79 @@ int sum_size(const MonomialSet& s1, const MonomialSet& s2){
 }
 
 
-static void step_T_complex(std::vector<PolynomialSugar>& curr, std::vector<Polynomial>& result,  const BooleMonomial& lm,GroebnerStrategy& strat){
-  std::sort(curr.begin(), curr.end(), PSCompareByEl());
-  const int max_cans=5;
-  int s=curr.size();
-  Polynomial reductor(strat.r);
-  int found;
-  wlen_type pivot_el;
-  
-  pivot_el=curr[0].eliminationLength();
-  
-  int i,j;
-  for (i=s-1;i>0;i--){
-    int found=0;
-    MonomialSet as_set(curr[i].value());
-    int c_size=sum_size(as_set, MonomialSet(curr[0].value()));
-    for (j=1;j<std::min(i,max_cans);j++){ 
-      int size2=sum_size(as_set, MonomialSet(curr[j].value()));
-      if (size2<c_size){
-        found=j;
-        c_size=size2;
-      }
-    }
-    curr[i].add(curr[found].value(), curr[found].getSugar(), curr[found].getLengthEstimation());
-  }
-  reductor=curr[0].value();
-  curr.erase(curr.begin());
-  PBORI_ASSERT(!(reductor.isZero()));
-  result.push_back(reductor);
-  
-  
-}
+// static void step_T_complex(std::vector<PolynomialSugar>& curr, std::vector<Polynomial>& result,  const BooleMonomial& lm,GroebnerStrategy& strat){
+//   std::sort(curr.begin(), curr.end(), PSCompareByEl());
+//   const int max_cans=5;
+//   int s=curr.size();
+//   Polynomial reductor(lm.ring());
 
-static void step_T(std::vector<PolynomialSugar>& curr, std::vector<Polynomial>& result,  const BooleMonomial& lm,GroebnerStrategy& strat){
-  int s=curr.size();
+//   wlen_type pivot_el;
+  
+//   pivot_el=curr[0].eliminationLength();
+  
+//   int i,j;
+//   for (i=s-1;i>0;i--){
+//     int found=0;
+//     MonomialSet as_set(curr[i].value());
+//     int c_size=sum_size(as_set, MonomialSet(curr[0].value()));
+//     for (j=1;j<std::min(i,max_cans);j++){ 
+//       int size2=sum_size(as_set, MonomialSet(curr[j].value()));
+//       if (size2<c_size){
+//         found=j;
+//         c_size=size2;
+//       }
+//     }
+//     curr[i].add(curr[found].value(), curr[found].getSugar(), curr[found].getLengthEstimation());
+//   }
+//   reductor=curr[0].value();
+//   curr.erase(curr.begin());
+//   PBORI_ASSERT(!(reductor.isZero()));
+//   result.push_back(reductor);
+  
+  
+// }
 
-  if (s>2) return step_T_complex(curr,result, lm, strat);
-  else
-    step_T_complex(curr,result, lm, strat);
+// static void step_T(std::vector<PolynomialSugar>& curr, std::vector<Polynomial>& result,  const BooleMonomial& lm,GroebnerStrategy& strat){
+//   int s=curr.size();
+
+//   if (s>2) return step_T_complex(curr,result, lm, strat);
+//   else
+//     step_T_complex(curr,result, lm, strat);
 
 
   
   
-}
+// }
 
 
 std::vector<Polynomial> parallel_reduce(std::vector<Polynomial> inp, GroebnerStrategy& strat, int average_steps, double delay_f){
 
   
   std::vector<Polynomial> result;
-  int i,s;
-  s=inp.size();
+  if (inp.empty())
+    return result;
+
+  std::size_t s=inp.size();
   int max_steps=average_steps*s;
   int steps=0;
   std::priority_queue<PolynomialSugar, std::vector<PolynomialSugar>, LMLessComparePS> to_reduce;
   deg_type max_sugar=0;
-  Polynomial::size_type max_length=0;
+  ///  Polynomial::size_type max_length=0;
   
-  for(i=0;i<s;i++){
-    if (inp[i].isOne()){
-      result.push_back(inp[i]);
-      return result;
-    }
-		if (inp[i].isZero()) continue;
-    PolynomialSugar to_push=PolynomialSugar(inp[i]);
-    //max_length=std::max(max_length,inp[i].length());
-    
-    max_sugar=std::max(max_sugar,to_push.getSugar());
-    
-    to_reduce.push(to_push);
+  for(std::size_t i=0;i<s;i++){
+      if (inp[i].isOne()){
+        result.push_back(inp[i]);
+        return result;
+      }
+      if (inp[i].isZero()) continue;
+      PolynomialSugar to_push=PolynomialSugar(inp[i]);
+      //max_length=std::max(max_length,inp[i].length());
+      
+      max_sugar=std::max(max_sugar,to_push.getSugar());
+      
+      to_reduce.push(to_push);
   }
-  const idx_type last_block_start=strat.r.ordering().lastBlockStart();
+  const idx_type last_block_start=inp[0].ring().ordering().lastBlockStart();
   while (!(to_reduce.empty())){
 
     std::vector<PolynomialSugar> curr;
@@ -600,7 +597,7 @@ std::vector<Polynomial> parallel_reduce(std::vector<Polynomial> inp, GroebnerStr
     to_reduce.pop();
 
     Monomial lm=curr[0].lead();
-    #ifdef HAVE_M4RI
+    #ifdef PBORI_HAVE_M4RI
     if (strat.optLinearAlgebraInLastBlock){
         if (!(lm.deg()==0)){
             
@@ -615,7 +612,7 @@ std::vector<Polynomial> parallel_reduce(std::vector<Polynomial> inp, GroebnerStr
                 la=strat.faugereStepDense(la);
                 
                 //result.insert(result.size(),la.begin(),la.end());
-                for(i=0;i<la.size();i++){
+                for(std::size_t i=0;i<la.size();i++){
                     PBORI_ASSERT(!(la[i].isZero()));
                     result.push_back(la[i]);
                 }
@@ -645,8 +642,7 @@ std::vector<Polynomial> parallel_reduce(std::vector<Polynomial> inp, GroebnerStr
     } else {
       //simly take the first, not so clever
      
-      int i,s;
-      s=curr.size();
+      std::size_t s = curr.size();
       if (s>1){
         steps+=curr.size()-1;
         step_T_simple(curr,result,lm,strat);
@@ -661,7 +657,7 @@ std::vector<Polynomial> parallel_reduce(std::vector<Polynomial> inp, GroebnerStr
     
     //after each loop push back
     s=curr.size();
-    for(i=0;i<s;i++){
+    for(std::size_t i=0; i < s; i++){
       if (!(curr[i].isZero())){
         if (((!strat.optLazy) ||((curr[i].getSugar()<=max_sugar)
        ))||(curr[i].isOne())){
@@ -696,8 +692,7 @@ std::vector<Polynomial> parallel_reduce(std::vector<Polynomial> inp, GroebnerStr
                     to_reduce.pop();
                 }
                 std::vector<PolynomialSugar>::iterator for_basis=std::min_element(this_lm.begin(),this_lm.end(),PSCompareByEl());
-                int i;
-                for(i=0;i<this_lm.size();i++){
+                for(std::size_t i=0;i<this_lm.size();i++){
                     if (this_lm[i].value()!=for_basis->value()){
                         strat.addGeneratorDelayed(this_lm[i].value());
                     }
@@ -736,7 +731,7 @@ int select_no_deg_growth(const ReductionStrategy& strat, const Monomial& m){
     MonomialSet::exp_iterator end=ms.expEnd();
     while(it!=end){
         Exponent curr=*it;
-        int index=strat.exp2Index.find(curr)->second;
+        int index=strat.index(curr);
         if (strat[index].ecart()==0){
             if (selected<0){
                 selected=index;
@@ -757,23 +752,23 @@ int select_no_deg_growth(const ReductionStrategy& strat, const Monomial& m){
   
 }
 
-static Polynomial nf4(GroebnerStrategy& strat, Polynomial p){
-  int index;
-  while((index=strat.generators.select1(p))>=0){
-    PBORI_ASSERT(index<strat.generators.size());
-    Polynomial* g=&strat.generators[index].p;
+// static Polynomial nf4(GroebnerStrategy& strat, Polynomial p){
+//   int index;
+//   while((index=strat.generators.select1(p))>=0){
+//     PBORI_ASSERT(index<strat.generators.size());
+//     const Polynomial* g=&strat.generators[index].p;
     
-    if((strat.generators[index].ecart()==0) && (strat.generators[index].length<=4) &&(strat.generators[index].lead!=p.lead())){
-      wlen_type dummy;
-      p=reduce_complete(p,strat.generators[index],dummy);
+//     if((strat.generators[index].ecart()==0) && (strat.generators[index].length<=4) &&(strat.generators[index].lead!=p.lead())){
+//       wlen_type dummy;
+//       p=reduce_complete(p,strat.generators[index],dummy);
       
-    } else{
-      p=spoly(p,*g);
-    }
-  }
-  return p;
+//     } else{
+//       p=spoly(p,*g);
+//     }
+//   }
+//   return p;
   
-}
+// }
 
 Polynomial do_plug_1(const Polynomial& p, const MonomialSet& m_plus_ones){
     MonomialSet::navigator m_nav=m_plus_ones.navigation();
@@ -782,7 +777,7 @@ Polynomial do_plug_1(const Polynomial& p, const MonomialSet& m_plus_ones){
         return p;
     }
     Polynomial::navigator p_nav=p.navigation();
-    if UNLIKELY(p_nav.isConstant()) return p;
+    if PBORI_UNLIKELY(p_nav.isConstant()) return p;
     idx_type p_index=*p_nav;
     while(p_index>*m_nav){
         PBORI_ASSERT(!(m_nav.isConstant()));

@@ -28,13 +28,12 @@
 #include <polybori/BooleExponent.h>
 #include <polybori/BooleMonomial.h>
 
-#include <polybori/cudd/cuddInt.h>
 
 #include <climits> // LINE_MAX
 #include <cstdio> // just for tmpfile()
 
 #include <polybori/BooleSet.h>
-#include <polybori/WeakRingPtr.h>
+  //#include <polybori/WeakRingPtr.h>
 
 BEGIN_NAMESPACE_PBORI
 
@@ -123,7 +122,7 @@ BoolePolyRing::print(ostream_type& os) const {
   FILE* out = tmpfile();
   bool no_error = false;
   if (out)
-    no_error = Cudd_PrintInfo(getManager(), out);
+    no_error = PBORI_PREFIX(Cudd_PrintInfo)(getManager(), out);
 
   if (no_error) {
     rewind(out);

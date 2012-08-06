@@ -12,7 +12,7 @@
 
   Author      [Fabio Somenzi]
 
-  Copyright   [Copyright (c) 1995-2004, Regents of the University of Colorado
+  Copyright   [Copyright (c) 1995-2012, Regents of the University of Colorado
 
   All rights reserved.
 
@@ -44,7 +44,7 @@
   ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
   POSSIBILITY OF SUCH DAMAGE.]
 
-  Revision    [$Id$]
+  Revision    [$Id: cuddInt.h,v 1.142 2012/02/05 01:07:19 fabio Exp $]
 
 ******************************************************************************/
 
@@ -88,9 +88,13 @@
 
 #include <math.h>
 #include "cudd.h"
-#ifdef CUDD_ORIG_INCLUSION
+#ifdef PBORI_FORCE_ORIGINAL_CUDD
 #include "st.h"
+
+#else 
+#include <polybori/cudd/prefix.h>
 #endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -206,6 +210,7 @@ extern "C" {
 #define DD_ADD_OUT_SUM_TAG			0x6e
 #define DD_BDD_LEQ_UNLESS_TAG			0x82
 #define DD_ADD_TRIANGLE_TAG			0x86
+#define DD_BDD_MAX_EXP_TAG			0x8a 
 
 /* Generator constants. */
 #define CUDD_GEN_CUBES 0
@@ -221,7 +226,7 @@ extern "C" {
 /*---------------------------------------------------------------------------*/
 
 struct DdGen {
-    DdManager	*manager;
+    PBORI_PREFIX(DdManager)	*manager;
     int		type;
     int		status;
     union {
@@ -239,14 +244,7 @@ struct DdGen {
     } gen;
     struct {
 	int	sp;
-#ifdef __osf__
-#pragma pointer_size save
-#pragma pointer_size short
-#endif
 	DdNode	**stack;
-#ifdef __osf__
-#pragma pointer_size restore
-#endif
     } stack;
     DdNode	*node;
 };
@@ -274,11 +272,6 @@ typedef int ptrint;
 typedef unsigned int ptruint;
 #endif
 
-#ifdef __osf__
-#pragma pointer_size save
-#pragma pointer_size short
-#endif
-
 typedef DdNode *DdNodePtr;
 
 /* Generic local cache item. */
@@ -301,7 +294,7 @@ typedef struct DdLocalCache {
     double minHit;
     double hits;
     unsigned int maxslots;
-    DdManager *manager;
+    PBORI_PREFIX(DdManager) *manager;
     struct DdLocalCache *next;
 } DdLocalCache;
 
@@ -324,7 +317,7 @@ typedef struct DdHashTable {
     int shift;
     unsigned int size;
     unsigned int maxsize;
-    DdManager *manager;
+    PBORI_PREFIX(DdManager) *manager;
 } DdHashTable;
 
 typedef struct DdCache {
@@ -352,7 +345,7 @@ typedef struct DdSubtable {	/* subtable for one index */
     Cudd_LazyGroupType varToBeGrouped; /* tells what grouping to apply */
 } DdSubtable;
 
-struct DdManager {	/* specialized DD symbol table */
+struct PBORI_PREFIX(DdManager) {	/* specialized DD symbol table */
     /* Constants */
     DdNode sentinel;		/* for collision lists */
     DdNode *one;		/* constant 1 */
@@ -419,7 +412,8 @@ struct DdManager {	/* specialized DD symbol table */
     CUDD_VALUE_TYPE epsilon;	/* tolerance on comparisons */
     /* Dynamic Reordering Parameters */
     int reordered;		/* flag set at the end of reordering */
-    int reorderings;		/* number of calls to Cudd_ReduceHeap */
+    unsigned int reorderings;	/* number of calls to Cudd_ReduceHeap */
+    unsigned int maxReorderings;/* maximum number of calls to Cudd_ReduceHeap */
     int siftMaxVar;		/* maximum number of vars sifted */
     int siftMaxSwap;		/* maximum number of swaps per sifting */
     double maxGrowth;		/* maximum growth during reordering */
@@ -433,20 +427,18 @@ struct DdManager {	/* specialized DD symbol table */
     int realignZ;		/* realign BDD order after ZDD reordering */
     unsigned int nextDyn;	/* reorder if this size is reached */
     unsigned int countDead;	/* if 0, count deads to trigger reordering */
-#ifdef CUDD_ORIG_INCLUSION
-    MtrNode *tree;		/* Variable group tree (BDD) */
-    MtrNode *treeZ;		/* Variable group tree (ZDD) */
+#ifdef PBORI_FORCE_ORIGINAL_CUDD
+    MtrNode *tree;		/* variable group tree (BDD) */
+    MtrNode *treeZ;		/* variable group tree (ZDD) */
 #endif
-    Cudd_AggregationType groupcheck; /* Used during group sifting */
-    int recomb;			/* Used during group sifting */
-    int symmviolation;		/* Used during group sifting */
-    int arcviolation;		/* Used during group sifting */
+    Cudd_AggregationType groupcheck; /* used during group sifting */
+    int recomb;			/* used during group sifting */
+    int symmviolation;		/* used during group sifting */
+    int arcviolation;		/* used during group sifting */
     int populationSize;		/* population size for GA */
     int	numberXovers;		/* number of crossovers for GA */
+    unsigned int randomizeOrder; /* perturb the next reordering threshold */
     DdLocalCache *localCaches;	/* local caches currently in existence */
-#ifdef __osf__
-#pragma pointer_size restore
-#endif
     char *hooks;		/* application-specific field (used by vis) */
     DdHook *preGCHook;		/* hooks to be called before GC */
     DdHook *postGCHook;		/* hooks to be called after GC */
@@ -454,18 +446,16 @@ struct DdManager {	/* specialized DD symbol table */
     DdHook *postReorderingHook;	/* hooks to be called after reordering */
     FILE *out;			/* stdout for this manager */
     FILE *err;			/* stderr for this manager */
-#ifdef __osf__
-#pragma pointer_size save
-#pragma pointer_size short
-#endif
     Cudd_ErrorType errorCode;	/* info on last error */
+    unsigned long startTime;    /* start time in milliseconds */
+    unsigned long timeLimit;    /* CPU time limit */
     /* Statistical counters. */
     unsigned long memused;	/* total memory allocated for the manager */
     unsigned long maxmem;	/* target maximum memory */
     unsigned long maxmemhard;	/* hard limit for maximum memory */
     int garbageCollections;	/* number of garbage collections */
-    long GCTime;		/* total time spent in garbage collection */
-    long reordTime;		/* total time spent in reordering */
+    unsigned long GCTime;	/* total time spent in garbage collection */
+    unsigned long reordTime;	/* total time spent in reordering */
     double totCachehits;	/* total number of cache hits */
     double totCacheMisses;	/* total number of cache misses */
     double cachecollisions;	/* number of cache collisions */
@@ -528,10 +518,6 @@ typedef struct DdLevelQueue {
     int numBuckets;
     int shift;
 } DdLevelQueue;
-
-#ifdef __osf__
-#pragma pointer_size restore
-#endif
 
 /*---------------------------------------------------------------------------*/
 /* Variable declarations                                                     */
@@ -728,8 +714,8 @@ typedef struct DdLevelQueue {
 ******************************************************************************/
 #if SIZEOF_VOID_P == 8 && SIZEOF_INT == 4
 #define ddHash(f,g,s) \
-((((unsigned)(unsigned long)(f) * DD_P1 + \
-   (unsigned)(unsigned long)(g)) * DD_P2) >> (s))
+((((unsigned)(ptruint)(f) * DD_P1 + \
+   (unsigned)(ptruint)(g)) * DD_P2) >> (s))
 #else
 #define ddHash(f,g,s) \
 ((((unsigned)(f) * DD_P1 + (unsigned)(g)) * DD_P2) >> (s))
@@ -749,9 +735,9 @@ typedef struct DdLevelQueue {
 ******************************************************************************/
 #if SIZEOF_VOID_P == 8 && SIZEOF_INT == 4
 #define ddCHash(o,f,g,h,s) \
-((((((unsigned)(unsigned long)(f) + (unsigned)(unsigned long)(o)) * DD_P1 + \
-    (unsigned)(unsigned long)(g)) * DD_P2 + \
-   (unsigned)(unsigned long)(h)) * DD_P3) >> (s))
+((((((unsigned)(ptruint)(f) + (unsigned)(ptruint)(o)) * DD_P1 + \
+    (unsigned)(ptruint)(g)) * DD_P2 + \
+   (unsigned)(ptruint)(h)) * DD_P3) >> (s))
 #else
 #define ddCHash(o,f,g,h,s) \
 ((((((unsigned)(f) + (unsigned)(o)) * DD_P1 + (unsigned)(g)) * DD_P2 + \
@@ -773,8 +759,8 @@ typedef struct DdLevelQueue {
 ******************************************************************************/
 #if SIZEOF_VOID_P == 8 && SIZEOF_INT == 4
 #define ddCHash2(o,f,g,s) \
-(((((unsigned)(unsigned long)(f) + (unsigned)(unsigned long)(o)) * DD_P1 + \
-   (unsigned)(unsigned long)(g)) * DD_P2) >> (s))
+(((((unsigned)(ptruint)(f) + (unsigned)(ptruint)(o)) * DD_P1 + \
+   (unsigned)(ptruint)(g)) * DD_P2) >> (s))
 #else
 #define ddCHash2(o,f,g,s) \
 (((((unsigned)(f) + (unsigned)(o)) * DD_P1 + (unsigned)(g)) * DD_P2) >> (s))
@@ -1035,148 +1021,151 @@ dd->nextSample += 250000;}
 /* Function prototypes                                                       */
 /*---------------------------------------------------------------------------*/
 
-extern DdNode * cuddAddExistAbstractRecur (DdManager *manager, DdNode *f, DdNode *cube);
-extern DdNode * cuddAddUnivAbstractRecur (DdManager *manager, DdNode *f, DdNode *cube);
-extern DdNode * cuddAddOrAbstractRecur (DdManager *manager, DdNode *f, DdNode *cube);
-extern DdNode * cuddAddApplyRecur (DdManager *dd, DdNode * (*)(DdManager *, DdNode **, DdNode **), DdNode *f, DdNode *g);
-extern DdNode * cuddAddMonadicApplyRecur (DdManager * dd, DdNode * (*op)(DdManager *, DdNode *), DdNode * f);
-extern DdNode * cuddAddScalarInverseRecur (DdManager *dd, DdNode *f, DdNode *epsilon);
-extern DdNode * cuddAddIteRecur (DdManager *dd, DdNode *f, DdNode *g, DdNode *h);
-extern DdNode * cuddAddCmplRecur (DdManager *dd, DdNode *f);
-extern DdNode * cuddAddNegateRecur (DdManager *dd, DdNode *f);
-extern DdNode * cuddAddRoundOffRecur (DdManager *dd, DdNode *f, double trunc);
-extern DdNode * cuddUnderApprox (DdManager *dd, DdNode *f, int numVars, int threshold, int safe, double quality);
-extern DdNode * cuddRemapUnderApprox (DdManager *dd, DdNode *f, int numVars, int threshold, double quality);
-extern DdNode * cuddBiasedUnderApprox (DdManager *dd, DdNode *f, DdNode *b, int numVars, int threshold, double quality1, double quality0);
-extern DdNode * cuddBddAndAbstractRecur (DdManager *manager, DdNode *f, DdNode *g, DdNode *cube);
-extern int cuddAnnealing (DdManager *table, int lower, int upper);
-extern DdNode * cuddBddExistAbstractRecur (DdManager *manager, DdNode *f, DdNode *cube);
-extern DdNode * cuddBddXorExistAbstractRecur (DdManager *manager, DdNode *f, DdNode *g, DdNode *cube);
-extern DdNode * cuddBddBooleanDiffRecur (DdManager *manager, DdNode *f, DdNode *var);
-extern DdNode * cuddBddIteRecur (DdManager *dd, DdNode *f, DdNode *g, DdNode *h);
-extern DdNode * cuddBddIntersectRecur (DdManager *dd, DdNode *f, DdNode *g);
-extern DdNode * cuddBddAndRecur (DdManager *manager, DdNode *f, DdNode *g);
-extern DdNode * cuddBddXorRecur (DdManager *manager, DdNode *f, DdNode *g);
-extern DdNode * cuddBddTransfer (DdManager *ddS, DdManager *ddD, DdNode *f);
-extern DdNode * cuddAddBddDoPattern (DdManager *dd, DdNode *f);
-extern int cuddInitCache (DdManager *unique, unsigned int cacheSize, unsigned int maxCacheSize);
-extern void cuddCacheInsert (DdManager *table, ptruint op, DdNode *f, DdNode *g, DdNode *h, DdNode *data);
-extern void cuddCacheInsert2 (DdManager *table, DdNode * (*)(DdManager *, DdNode *, DdNode *), DdNode *f, DdNode *g, DdNode *data);
-extern void cuddCacheInsert1 (DdManager *table, DdNode * (*)(DdManager *, DdNode *), DdNode *f, DdNode *data);
-extern DdNode * cuddCacheLookup (DdManager *table, ptruint op, DdNode *f, DdNode *g, DdNode *h);
-extern DdNode * cuddCacheLookupZdd (DdManager *table, ptruint op, DdNode *f, DdNode *g, DdNode *h);
-extern DdNode * cuddCacheLookup2 (DdManager *table, DdNode * (*)(DdManager *, DdNode *, DdNode *), DdNode *f, DdNode *g);
-extern DdNode * cuddCacheLookup1 (DdManager *table, DdNode * (*)(DdManager *, DdNode *), DdNode *f);
-extern DdNode * cuddCacheLookup2Zdd (DdManager *table, DdNode * (*)(DdManager *, DdNode *, DdNode *), DdNode *f, DdNode *g);
-extern DdNode * cuddCacheLookup1Zdd (DdManager *table, DdNode * (*)(DdManager *, DdNode *), DdNode *f);
-extern DdNode * cuddConstantLookup (DdManager *table, ptruint op, DdNode *f, DdNode *g, DdNode *h);
-extern int cuddCacheProfile (DdManager *table, FILE *fp);
-extern void cuddCacheResize (DdManager *table);
-extern void cuddCacheFlush (DdManager *table);
-extern int cuddComputeFloorLog2 (unsigned int value);
-extern int cuddHeapProfile (DdManager *dd);
+extern DdNode * cuddAddExistAbstractRecur (PBORI_PREFIX(DdManager) *manager, DdNode *f, DdNode *cube);
+extern DdNode * cuddAddUnivAbstractRecur (PBORI_PREFIX(DdManager) *manager, DdNode *f, DdNode *cube);
+extern DdNode * cuddAddOrAbstractRecur (PBORI_PREFIX(DdManager) *manager, DdNode *f, DdNode *cube);
+extern DdNode * cuddAddApplyRecur (PBORI_PREFIX(DdManager) *dd, DdNode * (*)(PBORI_PREFIX(DdManager) *, DdNode **, DdNode **), DdNode *f, DdNode *g);
+extern DdNode * cuddAddMonadicApplyRecur (PBORI_PREFIX(DdManager) * dd, DdNode * (*op)(PBORI_PREFIX(DdManager) *, DdNode *), DdNode * f);
+extern DdNode * cuddAddScalarInverseRecur (PBORI_PREFIX(DdManager) *dd, DdNode *f, DdNode *epsilon);
+extern DdNode * cuddAddIteRecur (PBORI_PREFIX(DdManager) *dd, DdNode *f, DdNode *g, DdNode *h);
+extern DdNode * cuddAddCmplRecur (PBORI_PREFIX(DdManager) *dd, DdNode *f);
+extern DdNode * cuddAddNegateRecur (PBORI_PREFIX(DdManager) *dd, DdNode *f);
+extern DdNode * cuddAddRoundOffRecur (PBORI_PREFIX(DdManager) *dd, DdNode *f, double trunc);
+extern DdNode * cuddUnderApprox (PBORI_PREFIX(DdManager) *dd, DdNode *f, int numVars, int threshold, int safe, double quality);
+extern DdNode * cuddRemapUnderApprox (PBORI_PREFIX(DdManager) *dd, DdNode *f, int numVars, int threshold, double quality);
+extern DdNode * cuddBiasedUnderApprox (PBORI_PREFIX(DdManager) *dd, DdNode *f, DdNode *b, int numVars, int threshold, double quality1, double quality0);
+extern DdNode * cuddBddAndAbstractRecur (PBORI_PREFIX(DdManager) *manager, DdNode *f, DdNode *g, DdNode *cube);
+extern int cuddAnnealing (PBORI_PREFIX(DdManager) *table, int lower, int upper);
+extern DdNode * cuddBddExistAbstractRecur (PBORI_PREFIX(DdManager) *manager, DdNode *f, DdNode *cube);
+extern DdNode * cuddBddXorExistAbstractRecur (PBORI_PREFIX(DdManager) *manager, DdNode *f, DdNode *g, DdNode *cube);
+extern DdNode * cuddBddBooleanDiffRecur (PBORI_PREFIX(DdManager) *manager, DdNode *f, DdNode *var);
+extern DdNode * cuddBddIteRecur (PBORI_PREFIX(DdManager) *dd, DdNode *f, DdNode *g, DdNode *h);
+extern DdNode * cuddBddIntersectRecur (PBORI_PREFIX(DdManager) *dd, DdNode *f, DdNode *g);
+extern DdNode * cuddBddAndRecur (PBORI_PREFIX(DdManager) *manager, DdNode *f, DdNode *g);
+extern DdNode * cuddBddXorRecur (PBORI_PREFIX(DdManager) *manager, DdNode *f, DdNode *g);
+extern DdNode * cuddBddTransfer (PBORI_PREFIX(DdManager) *ddS, PBORI_PREFIX(DdManager) *ddD, DdNode *f);
+extern DdNode * cuddAddBddDoPattern (PBORI_PREFIX(DdManager) *dd, DdNode *f);
+extern int PBORI_PREFIX(cuddInitCache) (PBORI_PREFIX(DdManager) *unique, unsigned int cacheSize, unsigned int maxCacheSize);
+extern void PBORI_PREFIX(cuddCacheInsert) (PBORI_PREFIX(DdManager) *table, ptruint op, DdNode *f, DdNode *g, DdNode *h, DdNode *data);
+extern void PBORI_PREFIX(cuddCacheInsert2) (PBORI_PREFIX(DdManager) *table, DdNode * (*)(PBORI_PREFIX(DdManager) *, DdNode *, DdNode *), DdNode *f, DdNode *g, DdNode *data);
+extern void PBORI_PREFIX(cuddCacheInsert1) (PBORI_PREFIX(DdManager) *table, DdNode * (*)(PBORI_PREFIX(DdManager) *, DdNode *), DdNode *f, DdNode *data);
+extern DdNode * PBORI_PREFIX(cuddCacheLookup) (PBORI_PREFIX(DdManager) *table, ptruint op, DdNode *f, DdNode *g, DdNode *h);
+extern DdNode * PBORI_PREFIX(cuddCacheLookupZdd) (PBORI_PREFIX(DdManager) *table, ptruint op, DdNode *f, DdNode *g, DdNode *h);
+extern DdNode * PBORI_PREFIX(cuddCacheLookup2) (PBORI_PREFIX(DdManager) *table, DdNode * (*)(PBORI_PREFIX(DdManager) *, DdNode *, DdNode *), DdNode *f, DdNode *g);
+extern DdNode * PBORI_PREFIX(cuddCacheLookup1) (PBORI_PREFIX(DdManager) *table, DdNode * (*)(PBORI_PREFIX(DdManager) *, DdNode *), DdNode *f);
+extern DdNode * PBORI_PREFIX(cuddCacheLookup2Zdd) (PBORI_PREFIX(DdManager) *table, DdNode * (*)(PBORI_PREFIX(DdManager) *, DdNode *, DdNode *), DdNode *f, DdNode *g);
+extern DdNode * PBORI_PREFIX(cuddCacheLookup1Zdd) (PBORI_PREFIX(DdManager) *table, DdNode * (*)(PBORI_PREFIX(DdManager) *, DdNode *), DdNode *f);
+extern DdNode * PBORI_PREFIX(cuddConstantLookup) (PBORI_PREFIX(DdManager) *table, ptruint op, DdNode *f, DdNode *g, DdNode *h);
+extern int PBORI_PREFIX(cuddCacheProfile) (PBORI_PREFIX(DdManager) *table, FILE *fp);
+extern void PBORI_PREFIX(cuddCacheResize) (PBORI_PREFIX(DdManager) *table);
+extern void PBORI_PREFIX(cuddCacheFlush) (PBORI_PREFIX(DdManager) *table);
+extern int PBORI_PREFIX(cuddComputeFloorLog2) (unsigned int value);
+extern int cuddHeapProfile (PBORI_PREFIX(DdManager) *dd);
 extern void cuddPrintNode (DdNode *f, FILE *fp);
-#ifdef CUDD_ORIG_INCLUSION
-extern void cuddPrintVarGroups (DdManager * dd, MtrNode * root, int zdd, int
+#ifdef PBORI_FORCE_ORIGINAL_CUDD
+extern void cuddPrintVarGroups (PBORI_PREFIX(DdManager) * dd, MtrNode * root, int zdd, int
 silent);
 #endif
-extern DdNode * cuddBddClippingAnd (DdManager *dd, DdNode *f, DdNode *g, int maxDepth, int direction);
-extern DdNode * cuddBddClippingAndAbstract (DdManager *dd, DdNode *f, DdNode *g, DdNode *cube, int maxDepth, int direction);
+extern DdNode * cuddBddClippingAnd (PBORI_PREFIX(DdManager) *dd, DdNode *f, DdNode *g, int maxDepth, int direction);
+extern DdNode * cuddBddClippingAndAbstract (PBORI_PREFIX(DdManager) *dd, DdNode *f, DdNode *g, DdNode *cube, int maxDepth, int direction);
 extern void cuddGetBranches (DdNode *g, DdNode **g1, DdNode **g0);
-extern int cuddCheckCube (DdManager *dd, DdNode *g);
-extern DdNode * cuddCofactorRecur (DdManager *dd, DdNode *f, DdNode *g);
-extern DdNode * cuddBddComposeRecur (DdManager *dd, DdNode *f, DdNode *g, DdNode *proj);
-extern DdNode * cuddAddComposeRecur (DdManager *dd, DdNode *f, DdNode *g, DdNode *proj);
-extern int cuddExact (DdManager *table, int lower, int upper);
-extern DdNode * cuddBddConstrainRecur (DdManager *dd, DdNode *f, DdNode *c);
-extern DdNode * cuddBddRestrictRecur (DdManager *dd, DdNode *f, DdNode *c);
-extern DdNode * cuddBddNPAndRecur (DdManager *dd, DdNode *f, DdNode *c);
-extern DdNode * cuddAddConstrainRecur (DdManager *dd, DdNode *f, DdNode *c);
-extern DdNode * cuddAddRestrictRecur (DdManager *dd, DdNode *f, DdNode *c);
-extern DdNode * cuddBddLICompaction (DdManager *dd, DdNode *f, DdNode *c);
-extern int cuddGa (DdManager *table, int lower, int upper);
-extern int cuddTreeSifting (DdManager *table, Cudd_ReorderingType method);
-extern int cuddZddInitUniv (DdManager *zdd);
-extern void cuddZddFreeUniv (DdManager *zdd);
-extern void cuddSetInteract (DdManager *table, int x, int y);
-extern int cuddTestInteract (DdManager *table, int x, int y);
-extern int cuddInitInteract (DdManager *table);
-extern DdLocalCache * cuddLocalCacheInit (DdManager *manager, unsigned int keySize, unsigned int cacheSize, unsigned int maxCacheSize);
-extern void cuddLocalCacheQuit (DdLocalCache *cache);
-extern void cuddLocalCacheInsert (DdLocalCache *cache, DdNodePtr *key, DdNode *value);
-extern DdNode * cuddLocalCacheLookup (DdLocalCache *cache, DdNodePtr *key);
-extern void cuddLocalCacheClearDead (DdManager *manager);
-extern int cuddIsInDeathRow (DdManager *dd, DdNode *f);
-extern int cuddTimesInDeathRow (DdManager *dd, DdNode *f);
-extern void cuddLocalCacheClearAll (DdManager *manager);
+extern DdNode * cuddCofactorRecur (PBORI_PREFIX(DdManager) *dd, DdNode *f, DdNode *g);
+extern DdNode * cuddBddComposeRecur (PBORI_PREFIX(DdManager) *dd, DdNode *f, DdNode *g, DdNode *proj);
+extern DdNode * cuddAddComposeRecur (PBORI_PREFIX(DdManager) *dd, DdNode *f, DdNode *g, DdNode *proj);
+extern int cuddExact (PBORI_PREFIX(DdManager) *table, int lower, int upper);
+extern DdNode * cuddBddConstrainRecur (PBORI_PREFIX(DdManager) *dd, DdNode *f, DdNode *c);
+extern DdNode * cuddBddRestrictRecur (PBORI_PREFIX(DdManager) *dd, DdNode *f, DdNode *c);
+extern DdNode * cuddBddNPAndRecur (PBORI_PREFIX(DdManager) *dd, DdNode *f, DdNode *c);
+extern DdNode * cuddAddConstrainRecur (PBORI_PREFIX(DdManager) *dd, DdNode *f, DdNode *c);
+extern DdNode * cuddAddRestrictRecur (PBORI_PREFIX(DdManager) *dd, DdNode *f, DdNode *c);
+extern DdNode * cuddBddLICompaction (PBORI_PREFIX(DdManager) *dd, DdNode *f, DdNode *c);
+extern int cuddGa (PBORI_PREFIX(DdManager) *table, int lower, int upper);
+extern int cuddTreeSifting (PBORI_PREFIX(DdManager) *table, Cudd_ReorderingType method);
+extern int PBORI_PREFIX(cuddZddInitUniv) (PBORI_PREFIX(DdManager) *zdd);
+extern void PBORI_PREFIX(cuddZddFreeUniv) (PBORI_PREFIX(DdManager) *zdd);
+extern void cuddSetInteract (PBORI_PREFIX(DdManager) *table, int x, int y);
+extern int cuddTestInteract (PBORI_PREFIX(DdManager) *table, int x, int y);
+extern int cuddInitInteract (PBORI_PREFIX(DdManager) *table);
+extern DdLocalCache * PBORI_PREFIX(cuddLocalCacheInit) (PBORI_PREFIX(DdManager) *manager, unsigned int keySize, unsigned int cacheSize, unsigned int maxCacheSize);
+extern void PBORI_PREFIX(cuddLocalCacheQuit) (DdLocalCache *cache);
+extern void PBORI_PREFIX(cuddLocalCacheInsert) (DdLocalCache *cache, DdNodePtr *key, DdNode *value);
+extern DdNode * PBORI_PREFIX(cuddLocalCacheLookup) (DdLocalCache *cache, DdNodePtr *key);
+extern void PBORI_PREFIX(cuddLocalCacheClearDead) (PBORI_PREFIX(DdManager) *manager);
+extern int PBORI_PREFIX(cuddIsInDeathRow) (PBORI_PREFIX(DdManager) *dd, DdNode *f);
+extern int PBORI_PREFIX(cuddTimesInDeathRow) (PBORI_PREFIX(DdManager) *dd, DdNode *f);
+extern void PBORI_PREFIX(cuddLocalCacheClearAll) (PBORI_PREFIX(DdManager) *manager);
 #ifdef DD_CACHE_PROFILE
 extern int cuddLocalCacheProfile (DdLocalCache *cache);
 #endif
-extern DdHashTable * cuddHashTableInit (DdManager *manager, unsigned int keySize, unsigned int initSize);
-extern void cuddHashTableQuit (DdHashTable *hash);
-extern int cuddHashTableInsert (DdHashTable *hash, DdNodePtr *key, DdNode *value, ptrint count);
-extern DdNode * cuddHashTableLookup (DdHashTable *hash, DdNodePtr *key);
-extern int cuddHashTableInsert1 (DdHashTable *hash, DdNode *f, DdNode *value, ptrint count);
-extern DdNode * cuddHashTableLookup1 (DdHashTable *hash, DdNode *f);
-extern int cuddHashTableInsert2 (DdHashTable *hash, DdNode *f, DdNode *g, DdNode *value, ptrint count);
-extern DdNode * cuddHashTableLookup2 (DdHashTable *hash, DdNode *f, DdNode *g);
-extern int cuddHashTableInsert3 (DdHashTable *hash, DdNode *f, DdNode *g, DdNode *h, DdNode *value, ptrint count);
-extern DdNode * cuddHashTableLookup3 (DdHashTable *hash, DdNode *f, DdNode *g, DdNode *h);
+extern DdHashTable * PBORI_PREFIX(cuddHashTableInit) (PBORI_PREFIX(DdManager) *manager, unsigned int keySize, unsigned int initSize);
+extern void PBORI_PREFIX(cuddHashTableQuit) (DdHashTable *hash);
+extern void PBORI_PREFIX(cuddHashTableGenericQuit) (DdHashTable *hash);
+extern int PBORI_PREFIX(cuddHashTableInsert) (DdHashTable *hash, DdNodePtr *key, DdNode *value, ptrint count);
+extern DdNode * PBORI_PREFIX(cuddHashTableLookup) (DdHashTable *hash, DdNodePtr *key);
+extern int PBORI_PREFIX(cuddHashTableInsert1) (DdHashTable *hash, DdNode *f, DdNode *value, ptrint count);
+extern DdNode * PBORI_PREFIX(cuddHashTableLookup1) (DdHashTable *hash, DdNode *f);
+extern int PBORI_PREFIX(cuddHashTableInsert2) (DdHashTable *hash, DdNode *f, DdNode *g, DdNode *value, ptrint count);
+extern DdNode * PBORI_PREFIX(cuddHashTableLookup2) (DdHashTable *hash, DdNode *f, DdNode *g);
+  extern int PBORI_PREFIX(cuddHashTableInsert3) (DdHashTable *hash, DdNode *f, DdNode *g, DdNode *h, DdNode *value, ptrint count);
+extern DdNode * PBORI_PREFIX(cuddHashTableLookup3) (DdHashTable *hash, DdNode *f, DdNode *g, DdNode *h);
+extern int PBORI_PREFIX(cuddHashTableGenericInsert)(DdHashTable * hash, DdNode * f, void * value);
+extern void * PBORI_PREFIX(cuddHashTableGenericLookup)(DdHashTable * hash, DdNode * f);
 extern DdLevelQueue * cuddLevelQueueInit (int levels, int itemSize, int numBuckets);
 extern void cuddLevelQueueQuit (DdLevelQueue *queue);
+extern void * cuddLevelQueueFirst(DdLevelQueue * queue, void * key, int  level);
 extern void * cuddLevelQueueEnqueue (DdLevelQueue *queue, void *key, int level);
 extern void cuddLevelQueueDequeue (DdLevelQueue *queue, int level);
-extern int cuddLinearAndSifting (DdManager *table, int lower, int upper);
-extern int cuddLinearInPlace (DdManager * table, int  x, int  y);
-extern void cuddUpdateInteractionMatrix (DdManager * table, int  xindex, int  yindex);
-extern int cuddInitLinear (DdManager *table);
-extern int cuddResizeLinear (DdManager *table);
-extern DdNode * cuddBddLiteralSetIntersectionRecur (DdManager *dd, DdNode *f, DdNode *g);
-extern DdNode * cuddCProjectionRecur (DdManager *dd, DdNode *R, DdNode *Y, DdNode *Ysupp);
-extern DdNode * cuddBddClosestCube (DdManager *dd, DdNode *f, DdNode *g, CUDD_VALUE_TYPE bound);
-extern void cuddReclaim (DdManager *table, DdNode *n);
-extern void cuddReclaimZdd (DdManager *table, DdNode *n);
-extern void cuddClearDeathRow (DdManager *table);
-extern void cuddShrinkDeathRow (DdManager *table);
-extern DdNode * cuddDynamicAllocNode (DdManager *table);
-extern int cuddSifting (DdManager *table, int lower, int upper);
-extern int cuddSwapping (DdManager *table, int lower, int upper, Cudd_ReorderingType heuristic);
-#ifdef CUDD_ORIG_INCLUSION
-extern int cuddNextHigh (DdManager *table, int x);
-extern int cuddNextLow (DdManager *table, int x);
+extern int cuddLinearAndSifting (PBORI_PREFIX(DdManager) *table, int lower, int upper);
+extern int cuddLinearInPlace (PBORI_PREFIX(DdManager) * table, int  x, int  y);
+extern void cuddUpdateInteractionMatrix (PBORI_PREFIX(DdManager) * table, int  xindex, int  yindex);
+extern int cuddInitLinear (PBORI_PREFIX(DdManager) *table);
+extern int cuddResizeLinear (PBORI_PREFIX(DdManager) *table);
+extern DdNode * cuddBddLiteralSetIntersectionRecur (PBORI_PREFIX(DdManager) *dd, DdNode *f, DdNode *g);
+extern DdNode * cuddCProjectionRecur (PBORI_PREFIX(DdManager) *dd, DdNode *R, DdNode *Y, DdNode *Ysupp);
+extern DdNode * cuddBddClosestCube (PBORI_PREFIX(DdManager) *dd, DdNode *f, DdNode *g, CUDD_VALUE_TYPE bound);
+extern void PBORI_PREFIX(cuddReclaim) (PBORI_PREFIX(DdManager) *table, DdNode *n);
+extern void PBORI_PREFIX(cuddReclaimZdd) (PBORI_PREFIX(DdManager) *table, DdNode *n);
+extern void PBORI_PREFIX(cuddClearDeathRow) (PBORI_PREFIX(DdManager) *table);
+extern void PBORI_PREFIX(cuddShrinkDeathRow) (PBORI_PREFIX(DdManager) *table);
+extern DdNode * cuddDynamicAllocNode (PBORI_PREFIX(DdManager) *table);
+extern int cuddSifting (PBORI_PREFIX(DdManager) *table, int lower, int upper);
+extern int cuddSwapping (PBORI_PREFIX(DdManager) *table, int lower, int upper, Cudd_ReorderingType heuristic);
+#ifdef PBORI_FORCE_ORIGINAL_CUDD
+extern int cuddNextHigh (PBORI_PREFIX(DdManager) *table, int x);
+extern int cuddNextLow (PBORI_PREFIX(DdManager) *table, int x);
 #endif
-extern int cuddSwapInPlace (DdManager *table, int x, int y);
-extern int cuddBddAlignToZdd (DdManager *table);
-extern DdNode * cuddBddMakePrime (DdManager *dd, DdNode *cube, DdNode *f);
-extern DdNode * cuddSolveEqnRecur (DdManager *bdd, DdNode *F, DdNode *Y, DdNode **G, int n, int *yIndex, int i);
-extern DdNode * cuddVerifySol (DdManager *bdd, DdNode *F, DdNode **G, int *yIndex, int n);
+extern int cuddSwapInPlace (PBORI_PREFIX(DdManager) *table, int x, int y);
+extern int cuddBddAlignToZdd (PBORI_PREFIX(DdManager) *table);
+extern DdNode * cuddBddMakePrime (PBORI_PREFIX(DdManager) *dd, DdNode *cube, DdNode *f);
+extern DdNode * cuddSolveEqnRecur (PBORI_PREFIX(DdManager) *bdd, DdNode *F, DdNode *Y, DdNode **G, int n, int *yIndex, int i);
+extern DdNode * cuddVerifySol (PBORI_PREFIX(DdManager) *bdd, DdNode *F, DdNode **G, int *yIndex, int n);
 #ifdef ST_INCLUDED
-extern DdNode* cuddSplitSetRecur (DdManager *manager, st_table *mtable, int *varSeen, DdNode *p, double n, double max, int index);
+extern DdNode* cuddSplitSetRecur (PBORI_PREFIX(DdManager) *manager, st_table *mtable, int *varSeen, DdNode *p, double n, double max, int index);
 #endif
-extern DdNode * cuddSubsetHeavyBranch (DdManager *dd, DdNode *f, int numVars, int threshold);
-extern DdNode * cuddSubsetShortPaths (DdManager *dd, DdNode *f, int numVars, int threshold, int hardlimit);
-extern int cuddSymmCheck (DdManager *table, int x, int y);
-extern int cuddSymmSifting (DdManager *table, int lower, int upper);
-extern int cuddSymmSiftingConv (DdManager *table, int lower, int upper);
-extern DdNode * cuddAllocNode (DdManager *unique);
-extern DdManager * cuddInitTable (unsigned int numVars, unsigned int numVarsZ, unsigned int numSlots, unsigned int looseUpTo);
-extern void cuddFreeTable (DdManager *unique);
-extern int cuddGarbageCollect (DdManager *unique, int clearCache);
+extern DdNode * cuddSubsetHeavyBranch (PBORI_PREFIX(DdManager) *dd, DdNode *f, int numVars, int threshold);
+extern DdNode * cuddSubsetShortPaths (PBORI_PREFIX(DdManager) *dd, DdNode *f, int numVars, int threshold, int hardlimit);
+extern int cuddSymmCheck (PBORI_PREFIX(DdManager) *table, int x, int y);
+extern int cuddSymmSifting (PBORI_PREFIX(DdManager) *table, int lower, int upper);
+extern int cuddSymmSiftingConv (PBORI_PREFIX(DdManager) *table, int lower, int upper);
+extern DdNode * PBORI_PREFIX(cuddAllocNode) (PBORI_PREFIX(DdManager) *unique);
+extern PBORI_PREFIX(DdManager) * PBORI_PREFIX(cuddInitTable) (unsigned int numVars, unsigned int numVarsZ, unsigned int numSlots, unsigned int looseUpTo);
+extern void PBORI_PREFIX(cuddFreeTable) (PBORI_PREFIX(DdManager) *unique);
+extern int PBORI_PREFIX(cuddGarbageCollect) (PBORI_PREFIX(DdManager) *unique, int clearCache);
 
 
-extern DdNode * cuddUniqueInter (DdManager *unique, int index, DdNode *T, DdNode *E);
-extern DdNode * cuddUniqueInterIVO (DdManager *unique, int index, DdNode *T, DdNode *E);
-extern DdNode * cuddUniqueInterZdd (DdManager *unique, int index, DdNode *T, DdNode *E);
-extern DdNode * cuddUniqueConst (DdManager *unique, CUDD_VALUE_TYPE value);
+extern DdNode * PBORI_PREFIX(cuddUniqueInter) (PBORI_PREFIX(DdManager) *unique, int index, DdNode *T, DdNode *E);
+extern DdNode * PBORI_PREFIX(cuddUniqueInterIVO) (PBORI_PREFIX(DdManager) *unique, int index, DdNode *T, DdNode *E);
+extern DdNode * PBORI_PREFIX(cuddUniqueInterZdd) (PBORI_PREFIX(DdManager) *unique, int index, DdNode *T, DdNode *E);
+extern DdNode * PBORI_PREFIX(cuddUniqueConst) (PBORI_PREFIX(DdManager) *unique, CUDD_VALUE_TYPE value);
 
 
-#ifdef ORIG_CUDD
+#ifdef PBORI_FORCE_ORIGINAL_CUDD
 
-extern DdNode * cuddZddGetNode (DdManager *zdd, int id, DdNode *T, DdNode *E);
+extern DdNode * cuddZddGetNode (PBORI_PREFIX(DdManager) *zdd, int id, DdNode *T, DdNode *E);
 #else
 static inline DdNode *
-cuddZddGetNode(
-  DdManager * zdd,
+PBORI_PREFIX(cuddZddGetNode) (
+  PBORI_PREFIX(DdManager) * zdd,
   int  id,
   DdNode * T,
   DdNode * E)
@@ -1185,65 +1174,65 @@ cuddZddGetNode(
 
     if (T == DD_ZERO(zdd))
 	return(E);
-    node = cuddUniqueInterZdd(zdd, id, T, E);
+    node = PBORI_PREFIX(cuddUniqueInterZdd)(zdd, id, T, E);
     return(node);
 
 }
 #endif
-extern DdNode * cuddZddGetNodeIVO (DdManager *dd, int index, DdNode *g, DdNode *h);
+extern DdNode * cuddZddGetNodeIVO (PBORI_PREFIX(DdManager) *dd, int index, DdNode *g, DdNode *h);
 
-extern void cuddRehash (DdManager *unique, int i);
-extern void cuddShrinkSubtable (DdManager *unique, int i);
-extern int cuddInsertSubtables (DdManager *unique, int n, int level);
-extern int cuddDestroySubtables (DdManager *unique, int n);
-extern int cuddResizeTableZdd (DdManager *unique, int index);
-extern void cuddSlowTableGrowth (DdManager *unique);
-extern int cuddP (DdManager *dd, DdNode *f);
+extern void PBORI_PREFIX(cuddRehash) (PBORI_PREFIX(DdManager) *unique, int i);
+extern void cuddShrinkSubtable (PBORI_PREFIX(DdManager) *unique, int i);
+extern int cuddInsertSubtables (PBORI_PREFIX(DdManager) *unique, int n, int level);
+extern int cuddDestroySubtables (PBORI_PREFIX(DdManager) *unique, int n);
+extern int PBORI_PREFIX(cuddResizeTableZdd) (PBORI_PREFIX(DdManager) *unique, int index);
+extern void PBORI_PREFIX(cuddSlowTableGrowth) (PBORI_PREFIX(DdManager) *unique);
+extern int cuddP (PBORI_PREFIX(DdManager) *dd, DdNode *f);
 #ifdef ST_INCLUDED
 extern enum st_retval cuddStCountfree (char *key, char *value, char *arg);
 extern int cuddCollectNodes (DdNode *f, st_table *visited);
 #endif
 extern DdNodePtr * cuddNodeArray (DdNode *f, int *n);
-extern int cuddWindowReorder (DdManager *table, int low, int high, Cudd_ReorderingType submethod);
-extern DdNode	* cuddZddProduct (DdManager *dd, DdNode *f, DdNode *g);
-extern DdNode	* cuddZddUnateProduct (DdManager *dd, DdNode *f, DdNode *g);
-extern DdNode	* cuddZddWeakDiv (DdManager *dd, DdNode *f, DdNode *g);
-extern DdNode	* cuddZddWeakDivF (DdManager *dd, DdNode *f, DdNode *g);
-extern DdNode	* cuddZddDivide (DdManager *dd, DdNode *f, DdNode *g);
-extern DdNode	* cuddZddDivideF (DdManager *dd, DdNode *f, DdNode *g);
-extern int cuddZddGetCofactors3 (DdManager *dd, DdNode *f, int v, DdNode **f1, DdNode **f0, DdNode **fd);
-extern int cuddZddGetCofactors2 (DdManager *dd, DdNode *f, int v, DdNode **f1, DdNode **f0);
-extern DdNode	* cuddZddComplement (DdManager *dd, DdNode *node);
-extern int cuddZddGetPosVarIndex(DdManager * dd, int index);
-extern int cuddZddGetNegVarIndex(DdManager * dd, int index);
-extern int cuddZddGetPosVarLevel(DdManager * dd, int index);
-extern int cuddZddGetNegVarLevel(DdManager * dd, int index);
-extern int cuddZddTreeSifting (DdManager *table, Cudd_ReorderingType method);
-extern DdNode	* cuddZddIsop (DdManager *dd, DdNode *L, DdNode *U, DdNode **zdd_I);
-extern DdNode	* cuddBddIsop (DdManager *dd, DdNode *L, DdNode *U);
-extern DdNode	* cuddMakeBddFromZddCover (DdManager *dd, DdNode *node);
-extern int cuddZddLinearSifting (DdManager *table, int lower, int upper);
-extern int cuddZddAlignToBdd (DdManager *table);
-#ifdef CUDD_ORIG_INCLUSION
-extern int cuddZddNextHigh (DdManager *table, int x);
-extern int cuddZddNextLow (DdManager *table, int x);
+extern int cuddWindowReorder (PBORI_PREFIX(DdManager) *table, int low, int high, Cudd_ReorderingType submethod);
+extern DdNode	* PBORI_PREFIX(cuddZddProduct) (PBORI_PREFIX(DdManager) *dd, DdNode *f, DdNode *g);
+extern DdNode	* PBORI_PREFIX(cuddZddUnateProduct) (PBORI_PREFIX(DdManager) *dd, DdNode *f, DdNode *g);
+extern DdNode	* PBORI_PREFIX(cuddZddWeakDiv) (PBORI_PREFIX(DdManager) *dd, DdNode *f, DdNode *g);
+extern DdNode	* PBORI_PREFIX(cuddZddWeakDivF) (PBORI_PREFIX(DdManager) *dd, DdNode *f, DdNode *g);
+extern DdNode	* PBORI_PREFIX(cuddZddDivide) (PBORI_PREFIX(DdManager) *dd, DdNode *f, DdNode *g);
+extern DdNode	* PBORI_PREFIX(cuddZddDivideF) (PBORI_PREFIX(DdManager) *dd, DdNode *f, DdNode *g);
+extern int PBORI_PREFIX(cuddZddGetCofactors3) (PBORI_PREFIX(DdManager) *dd, DdNode *f, int v, DdNode **f1, DdNode **f0, DdNode **fd);
+extern int PBORI_PREFIX(cuddZddGetCofactors2) (PBORI_PREFIX(DdManager) *dd, DdNode *f, int v, DdNode **f1, DdNode **f0);
+extern DdNode	* cuddZddComplement (PBORI_PREFIX(DdManager) *dd, DdNode *node);
+extern int PBORI_PREFIX(cuddZddGetPosVarIndex)(PBORI_PREFIX(DdManager) * dd, int index);
+extern int PBORI_PREFIX(cuddZddGetNegVarIndex)(PBORI_PREFIX(DdManager) * dd, int index);
+extern int PBORI_PREFIX(cuddZddGetPosVarLevel)(PBORI_PREFIX(DdManager) * dd, int index);
+extern int PBORI_PREFIX(cuddZddGetNegVarLevel)(PBORI_PREFIX(DdManager) * dd, int index);
+extern int cuddZddTreeSifting (PBORI_PREFIX(DdManager) *table, Cudd_ReorderingType method);
+extern DdNode	* cuddZddIsop (PBORI_PREFIX(DdManager) *dd, DdNode *L, DdNode *U, DdNode **zdd_I);
+extern DdNode	* cuddBddIsop (PBORI_PREFIX(DdManager) *dd, DdNode *L, DdNode *U);
+extern DdNode	* cuddMakeBddFromZddCover (PBORI_PREFIX(DdManager) *dd, DdNode *node);
+extern int cuddZddLinearSifting (PBORI_PREFIX(DdManager) *table, int lower, int upper);
+extern int cuddZddAlignToBdd (PBORI_PREFIX(DdManager) *table);
+#ifdef PBORI_FORCE_ORIGINAL_CUDD
+extern int cuddZddNextHigh (PBORI_PREFIX(DdManager) *table, int x);
+extern int cuddZddNextLow (PBORI_PREFIX(DdManager) *table, int x);
 #endif
 extern int cuddZddUniqueCompare (int *ptr_x, int *ptr_y);
-extern int cuddZddSwapInPlace (DdManager *table, int x, int y);
-extern int cuddZddSwapping (DdManager *table, int lower, int upper, Cudd_ReorderingType heuristic);
-extern int cuddZddSifting (DdManager *table, int lower, int upper);
-extern DdNode * cuddZddIte (DdManager *dd, DdNode *f, DdNode *g, DdNode *h);
-extern DdNode * cuddZddUnion (DdManager *zdd, DdNode *P, DdNode *Q);
-extern DdNode * cuddZddIntersect (DdManager *zdd, DdNode *P, DdNode *Q);
-extern DdNode * cuddZddDiff (DdManager *zdd, DdNode *P, DdNode *Q);
-extern DdNode * cuddZddChangeAux (DdManager *zdd, DdNode *P, DdNode *zvar);
-extern DdNode * cuddZddSubset1 (DdManager *dd, DdNode *P, int var);
-extern DdNode * cuddZddSubset0 (DdManager *dd, DdNode *P, int var);
-extern DdNode * cuddZddChange (DdManager *dd, DdNode *P, int var);
-extern int cuddZddSymmCheck (DdManager *table, int x, int y);
-extern int cuddZddSymmSifting (DdManager *table, int lower, int upper);
-extern int cuddZddSymmSiftingConv (DdManager *table, int lower, int upper);
-extern int cuddZddP (DdManager *zdd, DdNode *f);
+extern int cuddZddSwapInPlace (PBORI_PREFIX(DdManager) *table, int x, int y);
+extern int cuddZddSwapping (PBORI_PREFIX(DdManager) *table, int lower, int upper, Cudd_ReorderingType heuristic);
+extern int cuddZddSifting (PBORI_PREFIX(DdManager) *table, int lower, int upper);
+extern DdNode * PBORI_PREFIX(cuddZddIte) (PBORI_PREFIX(DdManager) *dd, DdNode *f, DdNode *g, DdNode *h);
+extern DdNode * PBORI_PREFIX(cuddZddUnion) (PBORI_PREFIX(DdManager) *zdd, DdNode *P, DdNode *Q);
+extern DdNode * PBORI_PREFIX(cuddZddIntersect) (PBORI_PREFIX(DdManager) *zdd, DdNode *P, DdNode *Q);
+extern DdNode * PBORI_PREFIX(cuddZddDiff) (PBORI_PREFIX(DdManager) *zdd, DdNode *P, DdNode *Q);
+extern DdNode * PBORI_PREFIX(cuddZddChangeAux) (PBORI_PREFIX(DdManager) *zdd, DdNode *P, DdNode *zvar);
+extern DdNode * PBORI_PREFIX(cuddZddSubset1) (PBORI_PREFIX(DdManager) *dd, DdNode *P, int var);
+extern DdNode * PBORI_PREFIX(cuddZddSubset0) (PBORI_PREFIX(DdManager) *dd, DdNode *P, int var);
+extern DdNode * PBORI_PREFIX(cuddZddChange) (PBORI_PREFIX(DdManager) *dd, DdNode *P, int var);
+extern int cuddZddSymmCheck (PBORI_PREFIX(DdManager) *table, int x, int y);
+extern int cuddZddSymmSifting (PBORI_PREFIX(DdManager) *table, int lower, int upper);
+extern int cuddZddSymmSiftingConv (PBORI_PREFIX(DdManager) *table, int lower, int upper);
+extern int cuddZddP (PBORI_PREFIX(DdManager) *zdd, DdNode *f);
 
 /**AutomaticEnd***************************************************************/
 
@@ -1252,8 +1241,19 @@ extern int cuddZddP (DdManager *zdd, DdNode *f);
 #endif
 
 
-#ifndef CUDD_ORIG_INCLUSION
+#ifndef PBORI_FORCE_ORIGINAL_CUDD
 #define Cudd_OutOfMem MMout_of_memory
+#endif
+
+/* For consistence: introduce prefixed macros */
+#ifndef PBORI_FORCE_ORIGINAL_CUDD
+#define pbori_cuddIsConstant cuddIsConstant
+#define pbori_cuddNot cuddNot
+#define pbori_cuddNotCond cuddNotCond
+#define pbori_cuddRegular cuddRegular
+#define pbori_cuddT cuddT
+#define pbori_cuddE cuddE
+#define pbori_cuddV cuddV
 #endif
 
 #endif /* _CUDDINT */

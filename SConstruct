@@ -5,8 +5,6 @@ if not 'Variables' in globals():
     Variables = Options
     BoolVariable = BoolOption
 
-opts = Variables('custom.py')
-
 # Some hard-coded settings
 pboriname = 'PolyBoRi'
 try:
@@ -26,14 +24,40 @@ import sys
 from os import sep, path
 from glob import glob
 
-m4ri=["grayflex.c", "permutation.c", 
-    "packedmatrix.c","strassen.c","misc.c",
-    "brilliantrussian.c",
-    "lqup.c", "trsm.c", "pluq_mmpf.c"]
+m4ri=Split("""grayflex.c permutation.c packedmatrix.c strassen.c
+misc.c brilliantrussian.c trsm.c mmc.c echelonform.c pls.c pls_mmpf.c""")
 m4ri=[path.join("M4RI/m4ri", m) for m in m4ri]
 
-m4ri_inc = 'M4RI/m4ri'
+m4ri_inc = 'M4RI'
 
+
+def pathsplit(p, rest=[]):
+    (h,t) = os.path.split(p)
+    if len(h) < 1: return [t]+rest
+    if len(t) < 1: return [h]+rest
+    return pathsplit(h,[t]+rest)
+
+def commonpath(l1, l2, common=[]):
+    if len(l1) < 1: return (common, l1, l2)
+    if len(l2) < 1: return (common, l1, l2)
+    if l1[0] != l2[0]: return (common, l1, l2)
+    return commonpath(l1[1:], l2[1:], common+[l1[0]])
+
+def relpath(p1, p2):
+    (common,l1,l2) = commonpath(pathsplit(p1), pathsplit(p2))
+    p = []
+    if len(l1) > 0:
+        p = [ ('..' + sep) * len(l1) ]
+    p = p + l2
+
+    if len(p) == 0:
+        return ''
+    return os.path.join( *p )
+
+def env_relpath(env, path, versus):
+    return relpath(env.subst(path), env.subst(versus))
+
+Environment.relpath = env_relpath
 
 def preprocessed_substitute(target, source, env):
     def preprocess_at(page):
@@ -43,14 +67,6 @@ def preprocessed_substitute(target, source, env):
         
     substitute_install(target, source, env, preprocess=preprocess_at)
     
-def expand_repeated(val, env):
-    from string import Template
-    newval = Template(val).safe_substitute(env)
-    while (val != newval):
-        val = newval
-        newval = Template(val).safe_substitute(env)
-
-    return val
 
 # Fix some paths and names
 class PathJoiner(object):
@@ -63,8 +79,13 @@ class PathJoiner(object):
     def validpath(self, *args):
         return [str(elt).replace('/', sep) for elt in args]
 
-[TestsPath, PyPBPath, CuddPath, GBPath, PBPath, DocPath] = [ PathJoiner(fdir)
-    for fdir in Split("""testsuite PyPolyBoRi Cudd groebner libpolybori doc""") ]
+[TestsPath, PyPBPath, CuddPath, GBPath, PBPath, DocPath, BuildPath] = \
+    [ PathJoiner(fdir)
+      for fdir in Split("""testsuite PyPolyBoRi Cudd groebner libpolybori doc
+ build""") ]
+
+M4RIPath = PathJoiner('M4RI')
+M4RIInc = PathJoiner(M4RIPath('m4ri'))
 
 DataPath = PathJoiner(TestsPath('py/data'))
 
@@ -83,7 +104,12 @@ def SplitColonSep(arg):
     return result
 
 def shell_output(*args):
-    return os.popen(' '.join(args)).read().strip()
+    from subprocess import Popen, PIPE, STDOUT
+    process = Popen(args, stdin=None, stdout=PIPE, stderr=STDOUT, env=os.environ)
+    
+    return process.communicate()[0].rstrip()
+
+
 
 pyroot="pyroot/"
 ipbroot = 'ipbori'
@@ -92,17 +118,28 @@ cudd_name = 'pboriCudd'
 
 [PyRootPath, IPBPath, GUIPath] = [PathJoiner(fdir) for fdir in [pyroot, ipbroot,
                                                                 guiroot] ]
-
-
 try:
 	import SCons.Tool.applelink as applelink
 except:
 	pass
 import os
 
-def FinalizePermissions(targets, perm):
+def FinalizePermissions(targets, perm=None):
+    def isdll(path):
+        return 'dll' in os.path.basename(path).split(os.path.extsep)[1:]
+    
     for src in targets:
-        env.AddPostAction(src, Chmod(str(src), perm))
+        path = str(src)
+        if not os.path.islink(path):
+            if perm is None:
+                if os.path.isdir(path):
+                    perm = 040755
+                else:
+                    if os.access(path, os.X_OK) or isdll(path):
+                        perm = 0755
+                    else:
+                        perm = 0644
+            env.AddPostAction(src, Chmod(path, perm))
     return targets
 
 def FinalizeExecs(targets):
@@ -110,6 +147,7 @@ def FinalizeExecs(targets):
 
 def FinalizeNonExecs(targets):
     return FinalizePermissions(targets, 0644)
+
 
 distribute = 'distribute' in COMMAND_LINE_TARGETS
 
@@ -121,32 +159,40 @@ generate_srpm = 'srpm' in COMMAND_LINE_TARGETS
 prepare_rpm = 'prepare-rpm' in COMMAND_LINE_TARGETS
 rpm_generation = generate_rpm or generate_srpm or prepare_rpm
 
-DefaultBuild = Default
-if distribute or rpm_generation or deb_generation:
-    def DefaultBuild(arg):
-        return arg
 
-defaultenv = Environment()
+# Undocumented switches (for debugging foreign platforms)
+defaultopts = Variables() # Works only from command line
+defaultopts.Add('PLATFORM', "Manually set another platform (unusual)")
+defaultopts.Add('TOOLS', "Manually set toolchain (unusual)", converter = Split)   
+
+defaultenv = Environment(ENV = os.environ, options=defaultopts)
 
 # See also: http://trac.sagemath.org/sage_trac/ticket/9872 and #6437
 def detect_linker(env):
     import re
-    if re.search("Binutils|GNU",  shell_output(env['CC'], '-Wl,-v', '2>&1')):
+    args = env.subst('$CC').split() + ['-Wl,-v']
+    if re.search("Binutils|GNU",  shell_output(*args)):
+        return "gnu"
+
+    # Non-gnu linker or linux (could be Sun or Intel linker) will return 'posix'.
+    return env['PLATFORM']
+
+def detect_compiler(env):
+    import re
+    args = env.subst('$CC').split() + ['-v']
+    if re.search("gcc version",  shell_output(*args)):
         return "gnu"
 
     # Non-gnu linker or linux (could be Sun or Intel linker) will return 'posix'.
     return env['PLATFORM']
 
 # for gentoo-prefix on OS X
-def _fix_dynlib_namespace(env):
+def _fix_dynlib_flags(env):
 
     if env['PLATFORM']=="darwin":
         return "-Wl,-flat_namespace"
-    return ""
+    return ''
 
-
-if 'dump_default' in COMMAND_LINE_TARGETS:
-  print defaultenv.Dump()
 
 def _sonameprefix(env):
     linker = detect_linker(env)
@@ -160,31 +206,30 @@ def _sonameprefix(env):
     else:
         return '-Wl,-soname,'
 
-# Define option handle, may be changed from command line or custom.py
-opts.Add('CXX', 'C++ Compiler (inherited from SCons with defaults:)' + \
-         repr(defaultenv['CXX']))
-opts.Add('CC', 'C Compiler (inherited from SCons with defaults:)' + \
-             repr(defaultenv['CC']))
+# dynamic module flags
+def _dynmodule_flags(env):
+    """Creates special flags for dynamic libraries, in particular on darwin."""
+    if env['PLATFORM'] == "darwin":
+        return "-Wl,-undefined -Wl,dynamic_lookup"
+    else:
+        return ""
 
-opts.Add('SHCXX', 
-         'C++ Compiler (preparing shared libraries); ' + \
-         'inherited with defaults: ' + repr(defaultenv['SHCXX']))
-opts.Add('SHCC', 
-         'C Compiler (preparing shared libraries); ' + \
-             'inherited with defaults: ' + repr(defaultenv['SHCC']))
+def _moduleflags(env):
+    if env['PLATFORM']=="darwin":
+        python_absolute = shell_output("which", env["PYTHON"])
+        return ["-fvisibility=hidden", "-bundle_loader", python_absolute]
 
-opts.Add('PYTHON', 'Python executable', "python$PROGSUFFIX")
+    return []
 
-opts.Add('LIBPATH', 'list of library paths (colon or whitespace separated)',
-         [], converter = SplitColonSep)
-opts.Add('CPPPATH', 'list of include paths (colon or whitespace separated)',
-         [], converter = SplitColonSep)
+def _relative_rpath(target, env):
+    if not target or env['PLATFORM'] in ["darwin", "cygwin"]:
+        return ''
 
-opts.Add('TEST_CPPPATH', 'list of include paths for tests (colon or whitespace separated)',
-         None, converter = SplitColonSep)
-
-opts.Add('CPPDEFINES', 'list of preprocessor defines (whitespace separated)',
-         ['PBORI_NDEBUG'], converter = Split)
+    targetdir = os.path.dirname(env.subst(str(target)))
+    libdir = BuildPath(env['DEVEL_LIB_PREFIX'].lstrip(sep))
+    relative_path = '\\$$ORIGIN/' + env.relpath(targetdir, libdir)
+    return [env['RPATHPREFIX'] + relative_path + env['RPATHSUFFIX'],
+            '-z', 'origin']
 
 def scons_version():
     import SCons
@@ -193,185 +238,279 @@ def scons_version():
 def oldstyle_flags():
     return scons_version() < ['0','97','0']
 
-if oldstyle_flags() :
-    opts.Add('CCFLAGS', "C compiler flags", 
-             "-O3 -std=c99", converter = Split)
-    opts.Add('CXXFLAGS', "C++ compiler flags", 
-             "-O3 -std=c++98 -ftemplate-depth-100",
-             converter = Split)
-else:
-    opts.Add('CCFLAGS', "C/C++ compiler flags", 
-             "-O3", converter = Split)
-    opts.Add('CFLAGS', "C compiler flags", "-std=c99",
-             converter = Split)
-    opts.Add('CXXFLAGS', "C++ compiler flags", 
-             "-std=c++98 -ftemplate-depth-100",
-             converter = Split)
 
-
-opts.Add('M4RI_CFLAGS', "C compiler flags for M4RI", converter = Split) 
-
-opts.Add('LINKFLAGS', "Linker flags (inherited from SCons with defaults:)" + \
-             repr(defaultenv['LINKFLAGS']))
-
-opts.Add('CUSTOM_LINKFLAGS',
-         """Addtional linker flags (e.g. '-s' for stripping, and
-         '-Wl,-flat_namespace,') for fixing install_name issue on Darwin""",
-         ["${_fix_dynlib_namespace(__env__)}"])
-
-
-opts.Add('LIBS', 'custom libraries needed for build', [], converter = Split)
-opts.Add('GD_LIBS', 'Library gb abd its dependencies (if needed)', ["gd"],
-         converter = Split)
-
-opts.Add('PREFIX', 'installation prefix directory', '/usr/local')
-opts.Add('EPREFIX','executables installation prefix directory', '$PREFIX/bin')
-
-opts.Add('INSTALLDIR', 'end user installation directory',
-         '$PREFIX/share/polybori')
-opts.Add('DOCDIR', 'documentation installation directory',
-         '$INSTALLDIR/doc')
-opts.Add('MANDIR', 'Man-pages installation directory',
-         '$PREFIX/man')
-opts.Add('PYINSTALLPREFIX',
-         'python modules directory (default is built-in site)', '$PYTHONSITE')
-
-opts.Add('DEVEL_PREFIX',
-         'development version installation directory','$PREFIX' )
-opts.Add('DEVEL_INCLUDE_PREFIX',
-         'development version header installation directory','$DEVEL_PREFIX/include' )
-opts.Add('DEVEL_LIB_PREFIX',
-         'development version library installation directory','$DEVEL_PREFIX/lib' )
-
-opts.Add('SINGULAR_HOME', 'directory of Singular development version', '')
-         
-opts.Add(BoolVariable('HAVE_DOXYGEN',
-                    'Generate doxygen-based documentation, if available', True))
-opts.Add(BoolVariable('HAVE_PYTHON_EXTENSION',
-                    'Build python extension, if possible', True))
-
-opts.Add('BOOST_PYTHON',
-         'Name of Boost-python library to link with', 'boost_python')
-
-opts.Add('BOOST_TEST',
-         'Name of Boost unit test framework library to link with',
-         'boost_unit_test_framework')
-
-
-opts.Add(BoolVariable('RELATIVE_SYMLINK',
-                    'Use relative symbolic links on install', True))
-
-opts.Add(BoolVariable('HAVE_L2H', 'Switch latex2html on/off (deprecated)', False))
-opts.Add(BoolVariable('HAVE_HEVEA', 'Switch hevea on/off (deprecated)', False))
-opts.Add(BoolVariable('HAVE_TEX4HT', 'Switch tex4ht on/off', True))
-
-
-opts.Add(BoolVariable('HAVE_PYDOC', 'Switch python doc generation on/off', True))
-opts.Add(BoolVariable('EXTERNAL_PYTHON_EXTENSION', 'External python interface',
-                    False))
-
-opts.Add(BoolVariable('USE_TIMESTAMP', 'Use timestamp on distribution', True))
-opts.Add(BoolVariable('SHLIBVERSIONING',
-                    'Use dlltool-style versionated shared library', True))
-opts.Add('SONAMEPREFIX', 'Prefix for compiler soname command.', 
-         '${_sonameprefix(__env__)}')
-opts.Add('SONAMESUFFIX','Suffix for compiler soname command.', '')
-
-opts.Add('INSTALL_NAME_DIR',
-         'Path to be used for dylib install_name (darwin only)',
-         '@loader_path')
-
-
-opts.Add('SHLINKFLAGS',
-         'Shared libraries link flags.')
-
-opts.Add('SONAMEFLAGS',
-         'Shared libraries link flags.',
-         ['${_sonamecmd(SONAMEPREFIX, TARGET, SONAMESUFFIX, __env__)}'])
-
-opts.Add('SHLIBVERSIONSUFFIX',
-         'Shared libraries suffix for library versioning.',
-         '-' + pboriversion +'.' + pborirelease +
-         defaultenv['SHLIBSUFFIX'] + '.' + libraryversion)
-
-
-def _shccflags(env):
-    if env['PLATFORM'] == "darwin":
-        return ["-fvisibility=hidden"]
-    return []
-
-opts.Add('MODULE_SHCCFLAGS',
-         'Additional dynamic module compile flags.',
-         ['${_shccflags(__env__)}'], converter = Split)
-
-opts.Add(BoolVariable('FORCE_HASH_MAP', "Force the use of gcc's deprecated " +
-"hash_map extension, even if unordered_map is available (avoiding of buggy " +
-"unordered_map)", False))
-
-opts.Add('RPATH', "rpath setting", [], converter = Split)
+class ExtendedVariables:
+    def __init__(self, vars, defaults):
+        from weakref import proxy
+        vars.AddWithDefaults = self
+        self.vars = proxy(vars)
+        self.defaults = defaults
+    def __call__(self, varname, *args, **kwds):   
+        self.vars.Add(varname, *args, **kwds)
+        self.vars.Add('DEFAULT_' + varname, 
+                      "defaults appended to " + repr(varname),
+                      self.defaults[varname])
 
 pbori_cache_macros=["PBORI_UNIQUE_SLOTS","PBORI_CACHE_SLOTS","PBORI_MAX_MEMORY"]
-for m in pbori_cache_macros:
-    opts.Add(m, 'PolyBoRi Cache macro value: '+m, None)
 
-tools =  ["default"]
+def setup_env(defaultenv):
+
+    opts = Variables('custom.py')
+
+    ExtendedVariables(opts, defaultenv)
+    
+    # Define option handle, may be changed from command line or custom.py
+    opts.Add('CXX', 'C++ Compiler (inherited from SCons)',
+             defaultenv['CXX'])
+    opts.Add('CC', 'C Compiler (inherited from SCons)',
+             defaultenv['CC'])
+
+    opts.Add('SHCXX', 
+             'C++ Compiler (preparing shared libraries; inherited from SCons)',
+             defaultenv['SHCXX'])
+    opts.Add('SHCC', 
+             'C Compiler (preparing shared libraries; inherited from SCons)',
+             defaultenv['SHCC'])
+
+    opts.Add('PYTHON', 'Python executable', "python$PROGSUFFIX")
+
+    opts.Add('LIBPATH', 'list of library paths (colon or whitespace separated)',
+             defaultenv.get('LIBPATH', []), converter = SplitColonSep)
+    opts.Add('CPPPATH', 'list of include paths (colon or whitespace separated)',
+             defaultenv.get('CPPPATH', []), converter = SplitColonSep)
+
+    opts.Add('TEST_CPPPATH', 'list of include paths for tests (colon or whitespace separated)',
+             None, converter = SplitColonSep)
+
+    opts.Add('CPPDEFINES', 'list of preprocessor defines (whitespace separated)',
+             defaultenv.get('CPPDEFINES',[]) + ['PBORI_NDEBUG'], converter = Split)
+
+
+    if oldstyle_flags() :
+        defaultenv.Append(CCFLAGS=["-std=c99", "$M4RI_CFLAGS"])
+        defaultenv.Append(CXXFLAGS=["-std=c++98", "$M4RI_CFLAGS", 
+                                    "-ftemplate-depth-100"])
+        for (var, help, default) in [('CCFLAGS', "C compiler flags", ["-O3"]),
+                                     ('CXXFLAGS', "C++ compiler flags", ["-O3"])]:
+            opts.AddWithDefaults(var, help, default, converter=Split)
+
+    else:
+        defaultenv.Append(CCFLAGS=["$M4RI_CFLAGS"])
+        defaultenv.Append(CFLAGS=["-std=c99"])
+        defaultenv.Append(CXXFLAGS=["-std=c++98", "-ftemplate-depth-100"])
+
+        for (var, help, default) in [('CCFLAGS', "C/C++ compiler flags", ["-O3"]),
+                                     ('CFLAGS', "C compiler flags", []),
+                                     ('CXXFLAGS', "C++ compiler flags", [])]:
+            opts.AddWithDefaults(var, help, default, converter=Split)
+
+
+    opts.Add('M4RI_CFLAGS', "C compiler flags for M4RI", converter = Split) 
+
+
+    defaultenv.Append(LINKFLAGS=['${_fix_dynlib_flags(__env__)}', 
+                                 '${_relative_rpath(TARGET, __env__)}'])
+    defaultenv.Append(SHLINKFLAGS=['$SONAMEFLAGS'])
+    defaultenv.Append(LDMODULEFLAGS=['${_moduleflags(__env__)}'])
+    defaultenv.Append(LIBS=[])
+
+    opts.AddWithDefaults('LINKFLAGS', 
+                         "Custom linker flags (e.g. '-s' for stripping)", [],
+                         converter=Split)
+
+    opts.AddWithDefaults('SHLINKFLAGS', 'Shared libraries link flags.', [],
+                         converter=Split)
+
+    opts.AddWithDefaults('LDMODULEFLAGS',
+                         'Dynamic module compile flags', [], converter=Split)
+
+    for flag in Split("""SHCCFLAGS SHCFLAGS SHCXXFLAGS FRAMEWORKS"""):
+        if defaultenv.has_key(flag):
+            opts.AddWithDefaults(flag, "flags inherited from SCons",
+                                 [], converter=Split)
+        else:
+            print "Flags", flag, "not in default environment!"
+
+
+    opts.AddWithDefaults('LIBS', 'custom libraries needed for build', [],
+                         converter = Split)
+    opts.Add('GD_LIBS', 'Library gb and its dependencies (if needed)', 
+             ["gd"], converter = Split)
+
+    opts.Add('PREFIX', 'installation prefix directory', '/usr/local')
+    opts.Add('EPREFIX','executables installation prefix directory', '$PREFIX/bin')
+
+    opts.Add('INSTALLDIR', 'end user installation directory',
+             '$PREFIX/share/polybori')
+    opts.Add('DOCDIR', 'documentation installation directory',
+             '$INSTALLDIR/doc')
+    opts.Add('MANDIR', 'Man-pages installation directory',
+             '$PREFIX/man')
+    opts.Add('PYINSTALLPREFIX',
+             'python modules directory (default is built-in site)', '$PYTHONSITE')
+
+    opts.Add('DEVEL_PREFIX',
+             'development version installation directory','$PREFIX' )
+    opts.Add('DEVEL_INCLUDE_PREFIX',
+             'development version header installation directory',
+             '$DEVEL_PREFIX/include' )
+    opts.Add('DEVEL_LIB_PREFIX',
+             'development version library installation directory',
+             '$DEVEL_PREFIX/lib' )
+
+    opts.Add(BoolVariable('M4RI_RPM',
+                          'Assume rpm knows about M4RI', False))   
+
+    opts.Add(BoolVariable('HAVE_DOXYGEN',
+                        'Generate doxygen-based documentation, if available', True))
+    opts.Add(BoolVariable('HAVE_PYTHON_EXTENSION',
+                        'Build python extension, if possible', True))
+
+    opts.Add('BOOST_PYTHON',
+             'Name of Boost-python library to link with', 'boost_python')
+
+    opts.Add('BOOST_TEST',
+             'Name of Boost unit test framework library to link with',
+             'boost_unit_test_framework')
+
+
+    opts.Add(BoolVariable('RELATIVE_SYMLINK',
+                          'Use relative symbolic links on install', True))
+
+    opts.Add(BoolVariable('HAVE_L2H', 'Switch latex2html on/off (deprecated)', 
+                          False))
+    opts.Add(BoolVariable('HAVE_HEVEA', 'Switch hevea on/off (deprecated)', False))
+    opts.Add(BoolVariable('HAVE_TEX4HT', 'Switch tex4ht on/off', True))
+
+
+    opts.Add(BoolVariable('HAVE_PYDOC', 'Switch python doc generation on/off',
+                          True))
+    opts.Add(BoolVariable('EXTERNAL_PYTHON_EXTENSION', 'External python interface',
+                          False))
+
+    opts.Add(BoolVariable('USE_TIMESTAMP', 'Use timestamp on distribution', True))
+    opts.Add(BoolVariable('SHLIBVERSIONING',
+                          'Use libtool-style versionated shared library', True))
+
+    opts.Add('SONAMEPREFIX', 'Prefix for compiler soname command.', 
+             '${_sonameprefix(__env__)}')
+    opts.Add('SONAMESUFFIX','Suffix for compiler soname command.', '')
+
+    opts.Add('SONAMEFLAGS',
+             'Shared libraries link flags.',
+             ['${_sonamecmd(SONAMEPREFIX, TARGET, SONAMESUFFIX, __env__)}'])
+
+
+    opts.Add('INSTALL_NAME_DIR',
+             'Path to be used for dylib install_name (darwin only)',
+             '@loader_path')
+
+    opts.Add('SHLIBVERSIONSUFFIX',
+             'Shared libraries suffix for library versioning.',
+             '-' + pboriversion +'.' + pborirelease +
+             defaultenv['SHLIBSUFFIX'] + '.' + libraryversion)
+
+
+
+    opts.Add(BoolVariable('FORCE_HASH_MAP', "Force the use of gcc's deprecated " +
+    "hash_map extension, even if unordered_map is available (avoiding of buggy " +
+    "unordered_map)", False))
+
+    opts.Add('RPATH', "rpath setting",  converter = SplitColonSep)
+
+
+    for m in pbori_cache_macros:
+        opts.Add(m, 'PolyBoRi Cache macro value: '+m, None)
+
+
+    for var in Split("""CCCOM CXXCOM SHCCCOM SHCXXCOM SHLINKCOM LINKCOM LINK SHLINK
+    SHLIBPREFIX LIBPREFIX SHLIBSUFFIX LIBSUFFIX"""):
+        if defaultenv.has_key(var):
+            opts.Add(var, 
+                     "inherited from SCons", defaultenv[var])
+    else:
+            if var != "LIBSUFFIX":
+                print "Variable", var, "not in default environment!"
+
+    opts.Add('CONFFILE', "Dump settings to file, if given", '')
+
+    opts.Add('PLATFORM', "Manually set another platform (unusual)",
+             defaultenv['PLATFORM'])
+
+    tools =  defaultenv['TOOLS'] + ["disttar", "doxygen"]
+
+
+    # Get paths and related things from current environment os.environ
+    # note: We cannot avoid those due to non-standard system setups,
+    #       also we do not know which variables are used in general
+
+    return (Environment(ENV = os.environ, options = opts, tools = tools, 
+                        toolpath = '.'), opts, tools)
+
+
+(env, opts, tools) = setup_env(defaultenv)
 
 if defaultenv['PLATFORM'] == "sunos":  # forcing gcc, keeping linker
-    def is_gcc():
-        compilerenv = Environment(options = opts)
-        return compilerenv['CC']  == 'gcc'
-    
-    if is_gcc():
-        tools = defaultenv['TOOLS']
+    def is_gnu():
+        compilerenv = Environment(ENV = os.environ, options = opts)
+        return (detect_compiler(compilerenv)  == 'gnu',
+                detect_linker(compilerenv)  == 'gnu')
+
+    (is_gcc, is_gnulink) = is_gnu()
+
+    tools = [tool for tool in defaultenv['TOOLS']]
+
+    if is_gcc:
         for arg in ['default', 'suncc', 'sunc++', 'sunar']:
             if arg in tools:
                 tools.remove(arg)
         tools +=  [ 'gcc', 'g++', 'ar']
-        defaultenv = Environment(tools=tools)
 
-for var in Split("""CCCOM CXXCOM SHCCCOM SHCXXCOM SHLINKCOM LINKCOM LINK SHLINK
-SHLIBPREFIX LIBPREFIX SHLIBSUFFIX LIBSUFFIX PLATFORM"""):
-    if defaultenv.has_key(var):
-        opts.Add(var, 
-                 "inherited from SCons with default: " + repr(defaultenv[var]))
+    if is_gnulink:
+        if 'sunlink' in tools:
+            tools.remove('sunlink')
+        tools +=  ['gnulink']
     else:
-        print "Variable", var, "not in default environment!"
+        if 'gnulink' in tools:
+            tools.remove('gnulink')
+        tools +=  ['sunlink']
+    if tools != defaultenv['TOOLS']:    
 
-for flag in Split("""SHCCFLAGS SHCFLAGS SHCXXFLAGS FRAMEWORKS"""):
-    if defaultenv.has_key(flag):
-        opts.Add(flag, "flags inherited from SCons with default: " + \
-                     repr(defaultenv[flag]),
-                 converter = Split)
-    else:
-        print "Flags", flag, "not in default environment!"
+        platform_opts = Variables(args={'PLATFORM': defaultenv['PLATFORM']})
+        defaultenv = Environment(ENV=os.environ, tools=tools,
+                                 options=platform_opts)
 
-
-opts.Add('CONFFILE', "Dump settings to file, if given", '')
+        (env, opts, tools) = setup_env(defaultenv)
 
 
-tools +=  ["disttar", "doxygen"]
+# Monkey patching Install/InstallAs to fix permissions on install
+_env_install = env.Install
+_env_installas = env.InstallAs
 
-# Get paths an related things from current environment
-# note: we cannot avoid those due to non-standard system setups
-getenv = dict()
-for key in ['PATH', 'HOME', 'LD_LIBRARY_PATH'] :
-    try:
-        getenv[key] = os.environ[key]
-    except KeyError:
-        pass
+def _env_install_final(env, *args):
+    return FinalizePermissions(_env_install(env, *args))
+
+def _env_installas_final(env, *args):
+    return FinalizePermissions(_env_installas(env, *args))
+
+_env_install_final.__doc__ = env.Install.__doc__
+_env_installas_final.__doc__ = env.InstallAs.__doc__
+
+env.Install = _env_install_final
+env.InstallAs = _env_installas_final
 
 
-env = Environment(ENV = getenv, options = opts, tools = tools, toolpath = '.')
-
-if 'dump' in COMMAND_LINE_TARGETS:
-  print env.Dump()
+# Another monkey patch: Ensure that necessary flags are appended 
+# (explicitely set DEFAULT_<flags>="" if defaults should be removed)
+for key in env.Dictionary().keys():
+    if key.startswith('DEFAULT_'):
+        env.AppendUnique(**{key.replace('DEFAULT_',''): ['$' + key]})
 
 # Extract some option values
 HAVE_DOXYGEN = env['HAVE_DOXYGEN'] and ("doxygen" in tools)
 HAVE_PYTHON_EXTENSION = env['HAVE_PYTHON_EXTENSION']
 
-SINGULAR_HOME = env['SINGULAR_HOME']
-USERLIBS = env['LIBS']
+USERLIBS = list(env.get('LIBS', []))
 
 # Skipping doxygen-based docu, if no doxygen is found.
 if HAVE_DOXYGEN:
@@ -397,20 +536,13 @@ def _sonamecmd(prefix, target, suffix, env = env):
 
         return ''
     
+
+
 env['_sonamecmd'] = _sonamecmd
 env['_sonameprefix'] = _sonameprefix
-env['_fix_dynlib_namespace'] = _fix_dynlib_namespace
-env['_shccflags'] = _shccflags
-
-# dynamic module flags
-def _dynmodule_flags(env):
-    """Creates special flags for dynamic libraries, in particular on darwin."""
-    if env['PLATFORM'] == "darwin":
-        return "-Wl,-undefined -Wl,dynamic_lookup"
-    else:
-        return ""
-
-    
+env['_fix_dynlib_flags'] = _fix_dynlib_flags
+env['_moduleflags'] = _moduleflags
+env['_relative_rpath'] = _relative_rpath  
 env['_dynmodule_flags'] = _dynmodule_flags
 
 
@@ -457,23 +589,21 @@ env.AlwaysBuild(config_h)
 class PythonConfig(object):
     def __init__(self, python_executable):
         def querycmd(arg):
-            return '"from distutils.sysconfig import *; print ' + arg + '"'
-        
+            from subprocess import Popen, PIPE, STDOUT
+            process = Popen([self.python], stdin=PIPE, stdout=PIPE, stderr=STDOUT,
+                           env=os.environ)
+            return process.communicate("from distutils.sysconfig import *\n" +
+                                       "print " + arg + "\n")[0].strip()
+
+
         self.python = python_executable
-        self.version = shell_output(self.python, "-c",
-                                    querycmd("get_python_version()"))
-        self.sitedir = shell_output(self.python, "-c",
-                                    querycmd("get_python_lib()"))
-        self.libdir = shell_output(self.python, "-c",
-                                   querycmd("get_config_vars()['LIBDIR']"))
-        self.incdir = shell_output(self.python, "-c",
-                                   querycmd("get_python_inc()"))
-        self.staticlibdir = shell_output(self.python, "-c",
-                                         querycmd("get_config_vars()['LIBPL']"))
-        self.libs = shell_output(self.python, "-c",
-                                 querycmd("get_config_vars()['LIBS']"))
-        self.module_suffix = shell_output(self.python, "-c",
-                                          querycmd("get_config_vars()['SO']"))
+        self.version = querycmd("get_python_version()")
+        self.sitedir = querycmd("get_python_lib()")
+        self.libdir = querycmd("get_config_vars()['LIBDIR']")
+        self.incdir = querycmd("get_python_inc()")
+        self.staticlibdir = querycmd("get_config_vars()['LIBPL']")
+        self.libs = querycmd("get_config_vars()['LIBS']")
+        self.module_suffix = querycmd("get_config_vars()['SO']")
 
         self.libs = self.libs.split()
         if env['PLATFORM']=="darwin":
@@ -481,16 +611,11 @@ class PythonConfig(object):
             self.libs=[l for l in self.libs if l.startswith('-l')]
         
         self.libs=[l.replace('-l','') for l in self.libs]
-            
         self.libname = 'python' + str(self.version)
 
-pyconf = PythonConfig(env["PYTHON"])
+pyconf = PythonConfig(env.subst("$PYTHON"))
 
 env.AppendUnique(PYTHONSITE = pyconf.sitedir)
-
-# Generate usage for scons -h here
-# (PYTHONSITE is already evaluated, but not python-specific paths)
-Help(opts.GenerateHelpText(env))
 
 have_l2h = have_t4h = False
 external_m4ri = False
@@ -505,7 +630,8 @@ if not env.GetOption('clean'):
         test_src_sizeof =  """
         #include <stdio.h>
         int main(int argc, char **argv) {
-          printf("SIZEOF_VOID_P=%i SIZEOF_INT=%i SIZEOF_LONG=%i", sizeof(void*), sizeof(int), sizeof(long));
+          printf("SIZEOF_VOID_P=%u SIZEOF_INT=%u SIZEOF_LONG=%u",
+            (unsigned)sizeof(void*), (unsigned)sizeof(int), (unsigned)sizeof(long));
           return 0;
         }
         """
@@ -517,19 +643,48 @@ if not env.GetOption('clean'):
         context.Result(result)
         return result
 
-    def GuessM4RIFlags(context):
+    def CheckLongLong(context):
+        context.Message('Checking whether C++ knows about long long... ')
+        test_src_longlong =  """
+        int main(int argc, char **argv) {
+          long long val = 0LL;
+          return (int)val;
+        }
+        """
+        (result, values) = context.TryRun(test_src_longlong, '.cc')
+        result = (result == 1)
+        context.Result(result)
+        return result
+
+    def GuessM4RIFlags(context, external):
         context.Message('Guessing m4ri compile flags... ')
+        if not external:
+            if not os.path.exists(M4RIInc('config.h')):
+                context.Message("Abusing m4ri's configure to get headers... ")
+                Execute("cd M4RI; ./configure --prefix=$PREFIX; cd -")
+        
         test_src =  """
         #include <m4ri/%s>
         #include <stdio.h>
         int main(int argc, char **argv) {
-          /* we test for some possible current and future configurations */
+        #ifdef __M4RI_SIMD_CFLAGS
+          /* get relevant compile flags of M4RI */
+          printf(__M4RI_SIMD_CFLAGS);
+          printf(" ");
+        #elif defined(__M4RI_CFLAGS)
+          /* fall back: get compile flags of M4RI */
+          printf(__M4RI_CFLAGS);
+          printf(" ");
+        #else
+          /* fall back: test for possible current and future configurations */
           %s
+        #endif
           return 0;
         }
         """  %  \
         ("%s", ''.join(["""
-        #if defined(__M4RI_HAVE_%(macro)s) || defined(HAVE_%(macro)s )
+        #if (defined(__M4RI_HAVE_%(macro)s) && (__M4RI_HAVE_%(macro)s)) || \
+          defined(HAVE_%(macro)s)
           printf("-m%(option)s ");
         #endif""" % \
         dict(macro=opt.replace('.','_').upper(), option=opt) for opt in \
@@ -548,52 +703,39 @@ if not env.GetOption('clean'):
 
     conf = Configure(env, 
                      custom_tests = {'CheckSizeOfTypes': CheckSizeOfTypes,
+                                     'CheckLongLong': CheckLongLong,
                                      'GuessM4RIFlags': GuessM4RIFlags})
+
     if not conf.CheckSizeOfTypes():
         print "Could not detect type sizes (maybe compile/link flags " + \
             "trouble)! Exiting."
         Exit(1)
 
-
-    gdlibs = env["GD_LIBS"]
-    if gdlibs and conf.CheckCHeader("gd.h"):
-        store_libs = env["LIBS"]
-        env.Append(LIBS=gdlibs[1:])
-        if conf.CheckLib(gdlibs[0]):
-            env.Append(CPPDEFINES=["HAVE_GD"])
-            GD_LIBS = gdlibs
-        env["LIBS"] = store_libs
-
+    if conf.CheckLongLong():
+        env.Append(CPPDefines='PBORI_HAVE_LONG_LONG')
 
     if env['FORCE_HASH_MAP']:
         if conf.CheckCXXHeader('ext/hash_map'):
-            env.Append(CPPDEFINES=["HAVE_HASH_MAP"])  
+            env.Append(CPPDEFINES=["PBORI_HAVE_HASH_MAP"])  
     else:
         if conf.CheckCXXHeader('unordered_map'):
-            env.Append(CPPDEFINES=["HAVE_UNORDERED_MAP"])
+            env.Append(CPPDEFINES=["PBORI_HAVE_UNORDERED_MAP"])
         elif conf.CheckCXXHeader('tr1/unordered_map'):
-            env.Append(CPPDEFINES=["HAVE_TR1_UNORDERED_MAP"])
+            env.Append(CPPDEFINES=["PBORI_HAVE_TR1_UNORDERED_MAP"])
         elif conf.CheckCXXHeader('ext/hash_map'):
-            env.Append(CPPDEFINES=["HAVE_HASH_MAP"])  
+            env.Append(CPPDEFINES=["PBORI_HAVE_HASH_MAP"])  
         
     extern_python_ext = env['EXTERNAL_PYTHON_EXTENSION']
     if HAVE_PYTHON_EXTENSION or extern_python_ext:
         env.Append(CPPPATH=[pyconf.incdir])
         env.Append(LIBPATH=[pyconf.libdir, pyconf.staticlibdir])
 
-        env.Prepend(CPPPATH=[PBPath('include'), GBPath('include')])
-        env.Append(CPPDEFINES=["PACKED","HAVE_M4RI"])
-        env.Prepend(LIBS = ["m"])
-
-
-    from re import search
-    for variable in os.environ:
-        if search("SAGE",variable):
-            env['ENV'][variable]=os.environ[variable]
+    env.Prepend(CPPPATH=[PBPath('include'), GBPath('include')])
+    env.Append(CPPDEFINES=["PBORI_HAVE_M4RI"])
 
 
     if HAVE_PYTHON_EXTENSION:
-        if not (conf.CheckLib(pyconf.libname)):
+        if not (conf.CheckLib(pyconf.libname, autoadd=0)):
             print "Python library not available (needed for python extension)!"
             HAVE_PYTHON_EXTENSION = False
 
@@ -604,14 +746,17 @@ if not env.GetOption('clean'):
             HAVE_PYTHON_EXTENSION = False
 
     if HAVE_PYTHON_EXTENSION:
-        if not ( conf.CheckLibWithHeader([env['BOOST_PYTHON']],
-                 path.join('boost', 'python.hpp'), 'c++') ):
-            HAVE_PYTHON_EXTENSION = False
+        store_libs =[elt for elt in env["LIBS"]]
+        env.Append(LIBS=pyconf.libname)
+        if not ( conf.CheckLibWithHeader([env['BOOST_PYTHON'], pyconf.libname ],
+                 path.join('boost', 'python.hpp'), 'c++', autoadd=0) ):
+
             print "Warning Boost/Python library (", env['BOOST_PYTHON'],
             print ") not available (needed for python extension)!"
             HAVE_PYTHON_EXTENSION = False
+        env["LIBS"] = store_libs
 
-    if not conf.CheckLib(BOOST_TEST):
+    if not conf.CheckLib(BOOST_TEST, autoadd=0):
          print "Warning Boost/unit test framework library (",
          print BOOST_TEST, ") not available. Skipping tests."
          BOOST_TEST = None
@@ -630,36 +775,76 @@ if not env.GetOption('clean'):
             if not have_t4h:
                 print "Warning: No LaTeX to html converter found,",
                 print "Tutorial will not be installed"
-    external_m4ri = conf.CheckLib('m4ri')
+    external_m4ri = conf.CheckLib('m4ri', autoadd=0)
+    m4ri_png = False
     if external_m4ri:
-       env['LIBS'] += ['m4ri']
+       env.Append(LIBS='m4ri')
+       if conf.CheckFunc('testing_m4ri_PNGs', """
+                   #include <m4ri/io.h>
+                   #define testing_m4ri_PNGs() mzd_to_png(NULL,"",0,"",0)"""):
+           m4ri_png = True
+           env.Append(CPPDEFINES=["PBORI_HAVE_M4RI_PNG"])
+           for suffix in ['', '12', '13', '10', '11']:
+               if conf.CheckLib('png' + suffix, autoadd=0):
+                   GD_LIBS = ['png' + suffix]
+                   break
     else:
-       env['CPPPATH'] = ['M4RI'] + env['CPPPATH']
+       env['CPPPATH'] = [m4ri_inc] + env['CPPPATH']
+       
+    conf.GuessM4RIFlags(external_m4ri)
 
+    if not m4ri_png:
+        gdlibs = env["GD_LIBS"]
+        if gdlibs and conf.CheckCHeader("gd.h"):
+            store_libs = [elt for elt in env["LIBS"]]
+            env.Append(LIBS=gdlibs[1:])
 
-    conf.GuessM4RIFlags()
+            if conf.CheckLib(gdlibs[0], autoadd=0):
+                env["LIBS"] = store_libs
+                env.Append(LIBS=gdlibs)
+                if conf.CheckFunc("testing_PNGs",
+                                  "#include<gd.h>\n#define testing_PNGs() gdImagePng(NULL,NULL) "):
+                    env.Append(CPPDEFINES=["PBORI_HAVE_GD"])
+                    GD_LIBS = gdlibs
+                else:
+                    print "libgd is available, but could not generate png file -",\
+                      "dependencies in GD_LIBS missing? -", \
+                      "Skipping gd-based optional features."
+            env["LIBS"] = store_libs
+
 
     env = conf.Finish()
 
 else: # when cleaning
     # Work around bug in older SCons (didn't remove symlinks to files)
     if scons_version() < ['1','3','0']:
-        for elt in glob('*' + env['SHLIBSUFFIX'] + "*"):
+        for elt in glob('*' + env['SHLIBSUFFIX'] + "*") + \
+                [PyRootPath('polybori/dynamic')]:
             if os.path.islink(elt):
                 os.remove(elt)
+
+    # things not handled by builders
+    for elt in [PyRootPath('polybori/dynamic')]:
+        if os.path.exists(elt) and os.path.islink(elt):
+            os.remove(elt)
  
 # end of not cleaning
 
-env.Clean('.', Split("""config.log .sconsign.dblite .sconf_temp""") + \
-              glob(PBPath('*' + env['LIBSUFFIX'])) + \
-              glob(GBPath('*' + env['LIBSUFFIX'])) + \
-              glob('*' + env['SHLIBSUFFIX'] + "*") + glob('*.pyc')  )
+env.Clean('.',  glob("config.log") + glob(".scon*") + \
+          glob(PBPath('*' + env['LIBSUFFIX'])) + \
+          glob(GBPath('*' + env['LIBSUFFIX'])) + \
+          glob('*' + env['SHLIBSUFFIX'] + "*") + glob('*.pyc')  )
 
 
 have_pydoc = env['HAVE_PYDOC']
 
 env['PBVERSION'] = pboriversion
 env['PBRELEASE'] = pborirelease
+
+if env['M4RI_RPM']:
+    env['PB_M4RI_RPM'] = "1"
+else:
+    env['PB_M4RI_RPM'] = "0"
 
 # Resoruces for including anything into the PyPolyBoRi shared library
 shared_resources = []
@@ -674,14 +859,14 @@ def build_symlink(target, source, env):
     source = source[0].abspath
 
     if env['RELATIVE_SYMLINK'] :
-        source = relpath(targetdir, source)
+        source = env.relpath(targetdir, source)
     if not source:
         source = '.'
 
     print "Symlinking from", source, "to", target
    
     if path.exists(targetpath):
-        Remove(targetpath)
+        os.remove(targetpath)
     os.symlink(source, targetpath)
 
     return None
@@ -693,28 +878,31 @@ env.Append(BUILDERS={'SymLink' : symlinkbld})
 def shared_object(o, **kwds):
     return env.SharedObject(o, **kwds)
 
-
 ######################################################################
-# Change some flags globally
+# Paths
 ######################################################################
 
-env.Append(SHLINKFLAGS=['$SONAMEFLAGS'])
-env.Append(SHLINKFLAGS=['$CUSTOM_LINKFLAGS'])
+InstPyPath = PathJoiner(env['PYINSTALLPREFIX'])
 
-env.Append(CCFLAGS="$M4RI_CFLAGS")
-env.Append(CXXFLAGS="$M4RI_CFLAGS")
-env.Append(SHCCFLAGS="$M4RI_CFLAGS")
-env.Append(SHCXXFLAGS="$M4RI_CFLAGS")
+DevelInstPath = PathJoiner(env['DEVEL_PREFIX'])
+PBInclPath = PathJoiner(PBPath('include/polybori'))
+DevelInstInclPath = PathJoiner(env['DEVEL_INCLUDE_PREFIX'], 'polybori')
+DevelInstLibPath = PathJoiner(env['DEVEL_LIB_PREFIX'])
+
+BuildLibPath = PathJoiner(BuildPath(DevelInstLibPath().lstrip(sep)))
+BuildPyPBPath = PathJoiner(BuildPath(InstPyPath('polybori/dynamic').lstrip(sep)))
+
 
 ######################################################################
 # Stuff for building Cudd library
 ######################################################################
 
-env.Append(CPPDEFINES=["HAVE_IEEE_754"])
+#env.Append(CPPDEFINES=["PBORI_HAVE_IEEE_754"])
 
 
 cudd_headers = [ CuddPath('cudd/' + fname + '.h') for fname in Split("""
-cuddInt cudd""") ]
+cuddInt cudd util""") ] + [PBInclPath('cudd/prefix' + fname + '.h')
+                      for fname in ['', '_internal'] ]
     
 cudd_resources = [CuddPath('cudd/cudd' + elt) for elt in Split("""
 API.c Cache.c Init.c LCache.c Ref.c Table.c ZddFuncs.c ZddSetop.c""") ]
@@ -722,7 +910,6 @@ API.c Cache.c Init.c LCache.c Ref.c Table.c ZddFuncs.c ZddSetop.c""") ]
 cudd_shared = shared_object(cudd_resources, CPPPATH = env['CPPPATH'] + [CuddPath()])
 
 #libCudd = env.StaticLibrary(CuddPath(cudd_name), cudd_resources)
-#DefaultBuild(libCudd)
 
 shared_resources += cudd_shared
 
@@ -785,12 +972,11 @@ libpb=env.StaticLibrary(PBPath(libpb_name_static), pb_src + cudd_resources)
 if isinstance(libpb,list):
     libpb=libpb[0]
 
-DefaultBuild(libpb)
 
 pb_shared = shared_object(pb_src)
 shared_resources += pb_shared
 
-libpbShared = slib(libpb_name, list(shared_resources))
+libpbShared = slib(BuildLibPath(libpb_name), list(shared_resources))
 pb_symlinks = SymlinkReadableLibname(libpbShared)
 
 env.Clean([libpb] + pb_shared, config_h)
@@ -808,7 +994,10 @@ gb_src = [GBPath('src', source) for source in gb_src]
 
 if not(external_m4ri):
    gb_src += m4ri
-
+   env.Clean(M4RIPath(), [M4RIPath(elt) for elt in Split(""".deps Makefile
+   config.status libtool m4ri.pc m4ri/config.h m4ri/m4ri_config.h m4ri/stamp-h1
+   testsuite/Makefile""")])
+   
 libgb_name = libpb_name + '_groebner'
 libgb_name_static = libgb_name
 
@@ -819,17 +1008,13 @@ gb=env.StaticLibrary(GBPath(libgb_name_static), gb_src)
 if isinstance(gb,list):
     gb=gb[0]
 
-DefaultBuild(gb)
-
 gb_shared = shared_object(gb_src)#env.SharedObject(gb_src)
 shared_resources += gb_shared
 
-libgbShared = slib(libgb_name, list(gb_shared),
-                   LIBPATH = ['.'] + env['LIBPATH'],
-                   LIBS = [libpb_name] + env['LIBS'] + GD_LIBS)
+libgbShared = slib(BuildLibPath(libgb_name), list(gb_shared),
+                   LIBS = libpbShared + env['LIBS'] + GD_LIBS)
 
 
-env.Depends(libgbShared, libpbShared + pb_symlinks)
 gb_symlinks = SymlinkReadableLibname(libgbShared)
 
 CPPPATH=env['CPPPATH']+[GBPath('include')]
@@ -854,7 +1039,7 @@ env.Clean(DocPath('c++'), docutarget)
 testclasses = Split("""GroebnerStrategy spoly term_accumulate CStringLiteral BooleEnv BooleSet BooleConstant BoolePolyRing BooleExponent BooleVariable BooleMonomial BoolePolynomial PBoRiError CCuddDDFacade DegRevLexAscOrder DegLexOrder
 BlockDegRevLexAscOrder BlockDegLexOrder  LexOrder 
 CFactoryBase MonomialFactory PolynomialFactory VariableFactory SetFactory
-weak_pointers FGLMStrategy""")
+weak_pointers FGLMStrategy PseudoLongProduct""")
 
 # Note: use custom TEST_CPPPATH settings for testing header installation, if any
 try:
@@ -875,9 +1060,8 @@ if BOOST_TEST:
     def test_building(target, sources, env):
         env.Program(target, sources + testmain, 
                     CPPPATH=testCPPPATH,
-                    LIBPATH=['libpolybori', 'groebner'] + env['LIBPATH'],
-                    LIBS = env['LIBS'] + [BOOST_TEST,
-                                          libpb_name, libgb_name] + GD_LIBS,
+                    LIBS = env['LIBS'] + \
+                        [BOOST_TEST] + libpbShared + libgbShared  + GD_LIBS,
                     CPPDEFINES = ["BOOST_TEST_DYN_LINK"] )
 
     test_building(TestsPath("unittests"), testfiles, env)
@@ -890,9 +1074,6 @@ if BOOST_TEST:
 # python extension
 ######################################################################
 LIBS = env['LIBS']+[env['BOOST_PYTHON']]+USERLIBS
-
-LIBS_static = [libpb_name, libgb_name] + LIBS
-#env["CPPDEFINES"].Append("Packed")
 
 
 documentable_python_modules = [PyRootPath('polybori', f)
@@ -910,8 +1091,8 @@ installable_python_modules = []
 
 pydocu = []
 dynamic_modules = []
+pypb_symlinks = []
 
-python_absolute = shell_output("which", env["PYTHON"])
 
 if HAVE_PYTHON_EXTENSION:
     wrapper_files=[ PyPBPath(f) for f in Split("""pypb_module.cc
@@ -920,55 +1101,73 @@ if HAVE_PYTHON_EXTENSION:
     monomial_wrapper.cc misc_wrapper.cc strategy_wrapper.cc set_wrapper.cc
     slimgb_wrapper.cc""") ] 
     
+
+    pypb=env.LoadableModule(BuildPyPBPath('PyPolyBoRi'),
+                            wrapper_files,
+                            LIBS = pyconf.libs + LIBS + \
+                                GD_LIBS + libpbShared + libgbShared,
+                            LDMODULESUFFIX = pyconf.module_suffix,
+                            LDMODULEPREFIX = "",
+                            )
+
+    env.Depends(pypb, pb_symlinks + gb_symlinks)
+    
     if env['PLATFORM']=="darwin":
-        libpypb_name = libpb_name + "_python"
-        libpypb = slib(libpypb_name,
-            wrapper_files[1:],
-            LINKFLAGS="-L.",
-            LIBS = pyconf.libs + LIBS + GD_LIBS+[libpb_name, libgb_name],
-            CPPPATH=CPPPATH)
-        pypb_symlinks = SymlinkReadableLibname(libpypb)
-        env.Depends(libpypb, libpbShared + libgbShared + pb_symlinks + gb_symlinks)
+            def fix_install_name(target, source, env):
+                names = ' '.join([str(elt) for elt in dylibs])
+                names = Split(shell_output('otool', '-D', names))[1::2]
+                for name in names:
+                    newname = "@loader_path/" + \
+                        env.relpath(InstPyPath("polybori/dynamic"),
+                                    DevelInstLibPath(os.path.basename(name)))
+                    env.Execute("install_name_tool -change %s %s %s"%(name, newname, target[0]))
 
-        dylibs += libpypb
+            env.AddPostAction(pypb, fix_install_name)
 
-        pypb=env.LoadableModule('PyPolyBoRi',
-            wrapper_files[0], # + shared_resources,
-            LINKFLAGS="-L. -bundle_loader " + python_absolute,
-            LIBS = pyconf.libs + LIBS + GD_LIBS+[libpb_name, libgb_name, libpypb_name], 
-            LDMODULESUFFIX=pyconf.module_suffix,
-            SHCCFLAGS=env['SHCCFLAGS'] + env['MODULE_SHCCFLAGS'],
-            CPPPATH=CPPPATH)
-        env.Depends(pypb, libpypb + pypb_symlinks)
-        dynamic_modules = env.SymLink(PyRootPath('polybori/dynamic',
-                                                 str(pypb[0])),  pypb)
+# __init__.py generator
+    def init_build(target, source, env):
+        """__init__.py building..."""
 
-    else:
-        #print "l:", l
-        pypb=env.SharedLibrary(PyPBPath('PyPolyBoRi'),
-            wrapper_files + shared_resources,
-            LDMODULESUFFIX=pyconf.module_suffix,SHLIBPREFIX="", LIBS = LIBS + GD_LIBS,
-            CPPPATH=CPPPATH)
-        dynamic_modules = env.Install(PyRootPath('polybori/dynamic'), pypb)
+        init_py_in = """# File: %(target)s
+# Automatically generated by PolyBoRi
+# This file is just for developing, it should not be installed.
+import imp
+imp.load_dynamic("polybori.dynamic.PyPolyBoRi", "%(source)s")
+"""
+
+        init_py = file(target[0].path, "w")
+        init_py.write(init_py_in  % dict(target = target[0].path, 
+                                   source = source[0].abspath))
+        init_py.close()
+        
+    def init_message(target, *args):
+        return target[0].path + " building..."
+        
+    dynamic_init_py = env.Command(PyRootPath('polybori/dynamic/__init__.py'), 
+                                  pypb, 
+                                  action = env.Action(init_build, init_message))
+
+    env.Alias(BuildPath(), dynamic_init_py) # Developers also need this
+
+    pypb_init_py = env.Command(BuildPyPBPath('__init__.py'), pypb, 
+                               [Touch("$TARGET")])
+
 
     # Define the dynamic python modules in pyroot
     documentable_python_modules += dynamic_modules
    
-    DefaultBuild(dynamic_modules)
-    
     
     polybori_modules = PyRootPath("polybori")
     #DefaultBuild(env.Install(polybori_modules, pypb))
     for (f,n) in installable_python_modules:
-        DefaultBuild(env.Install(polybori_modules, f))
+        env.Install(polybori_modules, f)
 
     
     to_append_for_profile = [libpb, gb]
     #to_append_for_profile=File('/lib/libutil.a')
     env.Program(PyPBPath('profiled'), wrapper_files+to_append_for_profile,
-            LDMODULESUFFIX=".so",SHLIBPREFIX="", 
             LIBS = LIBS + ["python" + str(pyconf.version)] + USERLIBS + pyconf.libs + GD_LIBS,
-            CPPPATH=CPPPATH, CPPDEFINES=env["CPPDEFINES"]+["PB_STATIC_PROFILING_VERSION"])
+            CPPDEFINES=env["CPPDEFINES"]+["PB_STATIC_PROFILING_VERSION"])
 
 
   
@@ -981,8 +1180,8 @@ if HAVE_PYTHON_EXTENSION or extern_python_ext:
     def pypb_emitter(target,source,env):
 
         TargetPath = PathJoiner(target[0].dir)
-        for file in source:
-            (fname, fext) = path.splitext(str(file).replace(pyroot,''))
+        for filename in source:
+            (fname, fext) = path.splitext(str(filename).replace(pyroot,''))
 
             if not fname.split(sep)[-1] == "__init__" :
                 if fext in ['.so', '.py'] :
@@ -1010,58 +1209,23 @@ if HAVE_PYTHON_EXTENSION or extern_python_ext:
     #bld=Builder("cd")
 
     
-HAVE_SINGULAR_EXTENSION=True
-
-import subprocess
-#import re
-if SINGULAR_HOME:
-  HAVE_SINGULAR_EXTENSION=True
-else:
-  HAVE_SINGULAR_EXTENSION=False
-
-if HAVE_SINGULAR_EXTENSION:
-
-    SINGULAR_LIBS = env['LIBS'] + [libgb_name, libpb_name]
-    
-    SING_ARCH= subprocess.Popen(["sh", SINGULAR_HOME+"/singuname.sh"], stdout=subprocess.PIPE).communicate()[0]
-    SING_ARCH=SING_ARCH.replace("\n","")
-    SING_INCLUDES=[SINGULAR_HOME+"/"+SING_ARCH+"/include",SINGULAR_HOME+"/kernel",SINGULAR_HOME+"/Singular"]
-
-    sing_pb_if = env.SharedLibrary('Singular/polybori_interface',
-                                   ["Singular/pb_if.cc"],
-                                   SHLIBPREFIX="", LDMODULESUFFIX=".so",
-                                   LIBS=SINGULAR_LIBS, CPPPATH = SING_INCLUDES + CPPPATH)
-    DefaultBuild(sing_pb_if)
-    
-    wrapper_files=["Singular/" + f  for f in ["pb.cc"]]
-    if env['PLATFORM']=="darwin":
-        singpb=env.LoadableModule('Singular/polybori_module', wrapper_files,
-            LINKFLAGS="-bundle_loader " + SINGULAR_HOME+"Singular/Singular",
-            LIBS=SINGULAR_LIBS,LDMODULESUFFIX=".so",
-            CPPPATH = SING_INCLUDES + CPPPATH)
-    else:
-        #print "l:", l
-        singpb=env.SharedLibrary('Singular/polybori_module', wrapper_files,
-            LDMODULESUFFIX=".so",SHLIBPREFIX="", LIBS=SINGULAR_LIBS,
-            CPPPATH=SING_INCLUDES+CPPPATH)
-    DefaultBuild(singpb)
-    
-
 
 # Source distribution archive generation
 env.Append(DISTTAR_EXCLUDEEXTS = Split(""".o .os .so .a .dll .cache .pyc
            .cvsignore .dblite .log .sconsign .depend .out .graphViz_temp .exe
            .kprof.html .rpm .spec .so.0 .so.0.0.0 .0 .gcda .orig .rej .bin"""),
            DISTTAR_EXCLUDEDIRS = Split("""CVS .svn .sconf_temp SOURCES BUILD
-           auxiliary"""),
+           auxiliary .deps"""),
            DISTTAR_EXCLUDEPATTERN = Split(""".#* #*# *~ profiled cacheopts.h
-           config.h coding.py unittests"""))
+           *config.h coding.py unittests Makefile config.status libtool
+           m4ri.pc stamp-h1"""))
 
+   
 if distribute or rpm_generation or deb_generation:
     allsrcs = Split("""SConstruct README LICENSE ChangeLog versionnumber
 disttar.py doxygen.py""")
     for dirname in Split("""groebner ipbori M4RI libpolybori 
-    PyPolyBoRi pyroot Singular pkgs gui testsuite"""):
+    PyPolyBoRi pyroot pkgs gui testsuite"""):
         allsrcs.append(env.Dir(dirname))
 
     # Cudd is not distributed completely (unused and unfree things removed)
@@ -1101,21 +1265,17 @@ if distribute:
     env.AlwaysBuild(srcdistri)
     env.Alias('distribute', srcdistri)
     
-dylibs += libpbShared + libgbShared
+dylibs += libpbShared + libgbShared 
 stlibs += [libpb, gb]
 
-readabledevellibs = pb_symlinks + gb_symlinks + SymlinkReadableLibname([libpb,
-                                                                        gb])
-
-DevelInstPath = PathJoiner(env['DEVEL_PREFIX'])
-PBInclPath = PathJoiner(PBPath('include/polybori'))
-DevelInstInclPath = PathJoiner(env['DEVEL_INCLUDE_PREFIX'], 'polybori')
-DevelInstLibPath = PathJoiner(env['DEVEL_LIB_PREFIX'])
+readabledevellibs = pb_symlinks + gb_symlinks + pypb_symlinks
 
 dylibs_inst  = env.Install(DevelInstLibPath(), dylibs)
 stlibs_inst  = env.Install(DevelInstLibPath(), stlibs)
+dylibs_readable_inst = SymlinkReadableLibname(dylibs_inst)
 
-devellibs_inst = SymlinkReadableLibname(dylibs_inst) + dylibs_inst + stlibs_inst
+devellibs_inst = dylibs_readable_inst + dylibs_inst + stlibs_inst
+
 
 # Installation for development purposes
 if 'devel-install' in COMMAND_LINE_TARGETS:
@@ -1147,7 +1307,7 @@ def cp_all(target, source, env):
 
     if not path.exists(target):
         try:
-            Execute(Mkdir(target))
+            env.Execute(Mkdir(target))
         except:
             # Maybe just a race condition occured, because two processes trixy
             # to generate the directory at the same time. (This I could ignore.)
@@ -1156,20 +1316,20 @@ def cp_all(target, source, env):
                 Exit(1)
 
     for patt in env['COPYALL_PATTERNS']:
-        for file in glob(path.join(source, patt)):
-            if not path.isdir(file):
-                result = str(path.join(target, path.basename(file)))
-                Execute([Copy(result, file), Chmod(result, 0644)])
+        for filename in glob(path.join(source, patt)):
+            if not path.isdir(filename):
+                result = str(path.join(target, path.basename(filename)))
+                env.Execute([Copy(result, filename), Chmod(result, 0644)])
 
     return None
 
 def CopyAll(targetdir, sourcedir, env):
     targets = []
     for patt in env['COPYALL_PATTERNS']:
-        for file in glob(path.join(sourcedir, patt)):
-            if not path.isdir(file):
-                result = str(path.join(targetdir, path.basename(file)))
-                targets += env.Install(targetdir, file)
+        for filename in glob(path.join(sourcedir, patt)):
+            if not path.isdir(filename):
+                result = str(path.join(targetdir, path.basename(filename)))
+                targets += env.Install(targetdir, filename)
 
     return FinalizeNonExecs(targets)            
 
@@ -1182,18 +1342,18 @@ def cp_pydoc(target, source, env):
     patt = re.compile('(file:|)/[^\" ]*' + pyroot, re.VERBOSE)
 
     if not path.exists(target):
-        Execute(Mkdir(target))
-    showpath = relpath(env.Dir(target).abspath,
-                       env.Dir(env['PYINSTALLPREFIX']).abspath)
+        env.Execute(Mkdir(target))
+    showpath = env.relpath(env.Dir(target).abspath,
+                           env.Dir(env['PYINSTALLPREFIX']).abspath)
 
     if showpath != '' and showpath[-1] != '/':
          showpath += '/'
-    for file in glob(path.join(source, '*.html')):
-        if not path.isdir(file):
-            fcontent = open(file).read()
+    for filename in glob(path.join(source, '*.html')):
+        if not path.isdir(filename):
+            fcontent = open(filename).read()
             fcontent = patt.sub(r''+showpath, fcontent)
 
-            result = str(path.join(target, path.basename(file)))
+            result = str(path.join(target, path.basename(filename)))
             open(result, "w").write(fcontent)
 
     return None
@@ -1233,32 +1393,6 @@ if have_t4h :
 
     tex_to_ht_bld = Builder(generator = t4h_action, emitter = t4h_emitter)
     env.Append(BUILDERS={'TeXToHt' : tex_to_ht_bld})
-
-
-
-def pathsplit(p, rest=[]):
-    (h,t) = os.path.split(p)
-    if len(h) < 1: return [t]+rest
-    if len(t) < 1: return [h]+rest
-    return pathsplit(h,[t]+rest)
-
-def commonpath(l1, l2, common=[]):
-    if len(l1) < 1: return (common, l1, l2)
-    if len(l2) < 1: return (common, l1, l2)
-    if l1[0] != l2[0]: return (common, l1, l2)
-    return commonpath(l1[1:], l2[1:], common+[l1[0]])
-
-def relpath(p1, p2):
-    (common,l1,l2) = commonpath(pathsplit(p1), pathsplit(p2))
-    p = []
-    if len(l1) > 0:
-        p = [ ('..' + sep) * len(l1) ]
-    p = p + l2
-
-    if len(p) == 0:
-        return ''
-    return os.path.join( *p )
-
 
 
 # substition function 
@@ -1422,7 +1556,7 @@ if rpm_generation:
 
     def provide_builddir(target, source, env):
         if not path.exists(RPMPath('BUILD')):
-            Execute(Mkdir(RPMPath('BUILD')))
+            env.Execute(Mkdir(RPMPath('BUILD')))
     
     env.AddPreAction(pbrpm, provide_builddir)
     env.AlwaysBuild(pbrpm)
@@ -1488,14 +1622,13 @@ if 'install' in COMMAND_LINE_TARGETS:
     InstPath = PathJoiner(env['INSTALLDIR'])
     InstExecPath = PathJoiner(env['EPREFIX'])
     InstDocPath = PathJoiner(env['DOCDIR'])
-    InstPyPath = PathJoiner(env['PYINSTALLPREFIX'])
     InstManPath = PathJoiner(env['MANDIR'])
     
     for inst_path in [InstPath(), InstExecPath(), InstDocPath(), InstPyPath(),
                       InstManPath()]:
         env.Alias('install', inst_path)
-    FinalizeNonExecs(env.Install(InstManPath('man1'), DocPath('man/ipbori.1')))
-    FinalizeNonExecs(env.Install(InstManPath('man1'), DocPath('man/PolyGUI.1')))
+    env.Install(InstManPath('man1'), DocPath('man/ipbori.1'))
+    env.Install(InstManPath('man1'), DocPath('man/PolyGUI.1'))
     
     # Executables and shared libraries to be installed
     so_pyfiles = []
@@ -1509,31 +1642,14 @@ if 'install' in COMMAND_LINE_TARGETS:
                 env.AddPostAction(elt, 
                                   "install_name_tool -id " + name + " $TARGET")
 
-        if HAVE_PYTHON_EXTENSION:
-            pypb_inst = FinalizeExecs(env.Install(InstPyPath("polybori/dynamic"),
-                                                  pypb))
-            env.Depends(pypb_inst, devellibs_inst)
-            so_pyfiles += pypb_inst
-
-            def fix_install_name(target, source, env):
-                names = ' '.join([str(elt) for elt in dylibs])
-                names = Split(shell_output('otool', '-D', names))[1::2]
-                for name in names:
-                    newname = "@loader_path/" + \
-                        relpath(InstPyPath("polybori/dynamic"),
-                                expand_repeated(DevelInstLibPath(os.path.basename(name)),env)) 
-                    Execute("install_name_tool -change %s %s %s"%(name, newname, target[0]))
-
-            env.AddPostAction(pypb_inst, fix_install_name)
-
-    else:
-        for instfile in dynamic_modules :
-            installedfile = InstPyPath(relpath(pyroot, instfile.path))
-            so_pyfiles += FinalizeExecs(env.InstallAs(installedfile, instfile))
+    if HAVE_PYTHON_EXTENSION:
+        pypb_inst = env.Install(InstPyPath("polybori/dynamic"), pypb)
+        env.Depends(pypb_inst, dylibs_inst + dylibs_readable_inst)
+        so_pyfiles += pypb_inst
 
     pyfiles = []
-    env['GUIPYPREFIX'] = relpath(expand_repeated(InstPath(GUIPath()), env),
-                                 env['PYINSTALLPREFIX'])
+    env['GUIPYPREFIX'] = env.relpath(InstPath(GUIPath()),
+                                     '$PYINSTALLPREFIX')
     
     for instfile in [ IPBPath('ipbori') ]:
         FinalizeExecs(env.SubstInstallAs(InstPath(instfile), instfile))
@@ -1542,10 +1658,10 @@ if 'install' in COMMAND_LINE_TARGETS:
         FinalizeExecs(env.SubstInstallAs(InstPath(instfile), instfile))
         
     for instfile in [GUIPath('cnf2ideal.py')]:
-        pyfiles += FinalizeNonExecs(env.InstallAs(InstPath(instfile), instfile))
+        pyfiles += env.InstallAs(InstPath(instfile), instfile)
         
     for instfile in [ GUIPath('polybori.png') ]:
-        FinalizeNonExecs(env.InstallAs(InstPath(instfile), instfile))
+        env.InstallAs(InstPath(instfile), instfile)
     
     # Copy c++ documentation
     if HAVE_DOXYGEN:
@@ -1581,13 +1697,16 @@ if 'install' in COMMAND_LINE_TARGETS:
 
     # Non-executables to be installed
     pyfile_srcs = glob(PyRootPath('polybori/*.py'))
-    pyfile_srcs += [PyRootPath('polybori/dynamic/__init__.py') ]
+
     if (float(pyconf.version) < 2.5): # removing advanced functionality
         pyfile_srcs.remove(PyRootPath('polybori/context.py'))
                        
     for instfile in pyfile_srcs :
-        targetfile = InstPyPath(relpath(PyRootPath(), instfile))
-        pyfiles += FinalizeNonExecs(env.InstallAs(targetfile, instfile))
+        targetfile = InstPyPath(env.relpath(PyRootPath(), instfile))
+        pyfiles += env.InstallAs(targetfile, instfile)
+
+    if HAVE_PYTHON_EXTENSION:
+        pyfiles +=  env.Install(InstPyPath("polybori/dynamic"), pypb_init_py)
 
     if HAVE_PYTHON_EXTENSION or extern_python_ext:
         cmdline = """$PYTHON -c "import compileall; compileall.compile_dir('"""
@@ -1597,19 +1716,14 @@ if 'install' in COMMAND_LINE_TARGETS:
         FinalizeNonExecs(env.Command([file1.path + 'c' for file1 in pyfiles],
                                      pyfiles, cmdline))
 
-    env['PYINSTALLPREFIX'] = expand_repeated(env['PYINSTALLPREFIX'], env)
-    env['RELATIVEPYPREFIX'] = relpath(expand_repeated(InstPath(IPBPath()),env),
-                                      env['PYINSTALLPREFIX'])       
-    env['PBORI_SITE'] = relpath(expand_repeated(InstPath(),env),
-                                      env['PYINSTALLPREFIX'])
-
-    for instfile in [IPBPath('ipythonrc-polybori') ] :
-        FinalizeNonExecs(env.SubstInstallAs(InstPath(instfile), instfile))
-      
+    env['PYINSTALLPREFIX'] = env.subst('$PYINSTALLPREFIX')
+    env['RELATIVEPYPREFIX'] = env.relpath(InstPath(IPBPath()),
+                                          '$PYINSTALLPREFIX')       
 
     # Symlink from executable into bin directory
     ipboribin = env.SymLink(InstExecPath('ipbori'),
                             InstPath(IPBPath('ipbori')))
+
 
     guibin = env.SymLink(InstExecPath('PolyGUI'),
                          InstPath(GUIPath('PolyGUI')))
@@ -1633,3 +1747,20 @@ if 'install' in COMMAND_LINE_TARGETS:
 
 env.Alias('prepare-devel', dylibs + stlibs + readabledevellibs)
 env.Alias('prepare-install', [pyroot, DocPath()])
+
+
+Default(BuildPath())
+
+# Generate usage for scons -h here
+# (PYTHONSITE is already evaluated, but not python-specific paths)
+Help(opts.GenerateHelpText(env))
+
+if 'dump_default' in COMMAND_LINE_TARGETS:
+  print defaultenv.Dump()
+
+if 'dump' in COMMAND_LINE_TARGETS:
+  print env.Dump()
+
+env.Alias('dump', 'SConstruct')
+env.Alias('dump_default', 'SConstruct')
+

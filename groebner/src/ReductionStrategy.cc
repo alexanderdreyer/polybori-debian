@@ -21,165 +21,99 @@
 #include <polybori/groebner/nf.h>
 #include <polybori/groebner/red_tail.h>
 
+
 BEGIN_NAMESPACE_PBORIGB
 
 
-void addPolynomialToReductor(Polynomial& p, MonomialSet& m); // groebner_alg.cc
-
-
-void ReductionStrategy::setupSetsForLastElement(){
-    const int s=size()-1;
-    PolyEntry e=(*this)[s];
-    Monomial lm=e.lead;
-    MonomialSet divisors_from_minimal=minimalLeadingTerms.divisorsOf(lm);//intersect(lm.divisors());
-
-    if(divisors_from_minimal.isZero()){
-       
-        
-        PBORI_ASSERT(!(Polynomial(lm).isZero()));
-        MonomialSet lm_multiples_min=minimalLeadingTerms.multiplesOf(lm);
-        //generators.minimalLeadingTerms.intersect(lm.multiples(minimalLeadingTerms.usedVariables()));
-        lm_multiples_min=lm_multiples_min.diff(lm.diagram());
-        //(lm.diagram()).diff(lm.diagram());
-    
-        PBORI_ASSERT(lm_multiples_min.intersect(minimalLeadingTerms).intersect(lm.diagram()).isZero());
-
-        {
-        
-        
-            MonomialSet::exp_iterator mfm_start=lm_multiples_min.expBegin();
-            MonomialSet::exp_iterator mfm_end=lm_multiples_min.expEnd();
-            while(mfm_start!=mfm_end){
-                PBORI_ASSERT((*mfm_start)!=e.leadExp);
-                PBORI_ASSERT((*mfm_start).reducibleBy(e.leadExp));
-                (*this)[exp2Index[*mfm_start]].minimal=false;
-                mfm_start++;
-            }
-        }
-        minimalLeadingTerms = minimalLeadingTerms.diff(lm_multiples_min).unite(lm.diagram());
-        
-
-        
-    } else 
-    {
-        //cerr<<"Warning:adding non minimal element to strategy"<<std::endl;
-        //PBORI_ASSERT(false);
-        if (!(divisors_from_minimal.diff(lm.diagram()).isZero()))
-            (*this)[s].minimal=false;
-    }
-    leadingTerms = leadingTerms.unite(Polynomial(lm).diagram());
-    if ((*this)[s].literal_factors.is11Factorization())
-        leadingTerms11 = leadingTerms11.unite(Polynomial(lm).diagram());
-    //doesn't need to be undone on simplification
-    if ((*this)[s].literal_factors.is00Factorization())
-        leadingTerms00 = leadingTerms00.unite(Polynomial(lm).diagram());
-    lm2Index[(*this)[s].lead]=s;
-    exp2Index[(*this)[s].leadExp]=s;
-
-    
-    if (e.length==1){
-        PBORI_ASSERT(e.p.length()==1);
-        monomials=monomials.unite(e.p.diagram());
-    } //else treat_m_p_1_case(e);
-    #ifdef LL_RED_FOR_GROEBNER
-    if (optLL){
-
-            if (((*this)[s].leadDeg==1) &&(*((*this)[s].p.navigation())==*((*this)[s].lead.diagram().navigation()))){
-                addPolynomialToReductor((*this)[s].p,llReductor);
-            }
-    }
-    #endif
+/// @note do not inline (optimization screws for some reason)
+/// @todo Check whether this is still the case!
+/// see: HeuristicQuickTestCase.test_mult6x6mit_lp 
+///      HeuristicCryptoTestCase.test_ctc_Nr3_B7_n20joined_dp_asc
+void ReductionStrategy::setupSetsForElement(const PolyEntry& entry) {
+  
+  PBORI_ASSERT(entry.lead.exp() == entry.leadExp);
+  unmarkNonMinimalLeadingTerms( minimalLeadingTerms.update(entry.lead) );
+  
+  leadingTerms.update(entry);
+  leadingTerms00.update(entry); //doesn't need to be undone on simplification
+  leadingTerms11.update(entry);
+  
+  monomials.update(entry);
+  
+#ifdef LL_RED_FOR_GROEBNER
+  if (optLL) {
+    Polynomial updated = llReductor.update(entry);
+    if (updated != entry.p)
+      exchange(entry.lead, updated);
+  }
+#endif
 }
 
+int
+ReductionStrategy::select_short_by_terms(const MonomialSet& terms) const {
+  MonomialSet ms(leadingTerms.intersect(terms));
+  int res = minimum(ms.begin(), ms.end(), LessWeightedLengthInStrat(*this));
 
+  if (res == -1 || (*this)[res].weightedLength<=2)
+    return res;
+
+  return -1;
+}
  
-int ReductionStrategy::select_short(const Polynomial& p) const{
-  MonomialSet ms=leadingTerms.intersect(p.leadDivisors());
-  //Polynomial workaround =Polynomial(ms);
-  
-  if (ms.isZero())
-    return -1;
-  else {
-    
-    //Monomial min=*(std::min_element(ms.begin(),ms.end(), LessWeightedLengthInStrat(strat)));
-    Monomial min=*(std::min_element(ms.begin(),ms.end(), LessWeightedLengthInStrat(*this)));
-    
-    int res=lm2Index.find(min)->second;
-    if (((*this)[res].weightedLength<=2)/*||(strat.generators[res].ecart()==0)*/) return res;
-    else return -1;
-  }
-  
-}
-
-int ReductionStrategy::select_short(const Monomial& m) const{
-  MonomialSet ms=leadingTerms.intersect(m.divisors());
-  if (ms.isZero())
-    return -1;
-  else {
-    //Monomial min=*(std::min_element(ms.begin(),ms.end(), LessWeightedLengthInStrat(strat)));
-    Monomial min=*(std::min_element(ms.begin(),ms.end(), LessWeightedLengthInStrat(*this)));
-    int res=lm2Index.find(min)->second;
-    if (((*this)[res].weightedLength<=2)/*||(strat.generators[res].ecart()==0)*/) return res;
-    else return -1;
-
-  }
-}
 
 typedef LessWeightedLengthInStratModified StratComparerForSelect;
 
-int ReductionStrategy::select1( const Polynomial& p) const{
-  MonomialSet ms=leadingTerms.divisorsOf(p.lead());//strat.leadingTerms.intersect(p.leadDivisors());
-  //Polynomial workaround =Polynomial(ms);
-  
-  if (ms.isZero())
-    return -1;
-  else {
+
+int
+ReductionStrategy::select1(const Polynomial& p) const {
+
 #ifdef LEX_LEAD_RED_STRAT
-    if (p.ring().ordering().isLexicographical()){
-      Exponent min=*(ms.expBegin());
-      return exp2Index.find(min)->second;
-    }
+  if (p.ring().ordering().isLexicographical()) {
+    MonomialSet ms = leadingTerms.divisorsOf(p.lexLead());
+    return (ms.isZero()?  -1:  index(*ms.expBegin()));
+  }
 #endif
-    //Monomial min=*(std::min_element(ms.begin(),ms.end(), LessWeightedLengthInStrat(strat)));
-    Exponent min=*(std::min_element(ms.expBegin(),ms.expEnd(), StratComparerForSelect(*this)));
 
-    return exp2Index.find(min)->second;
-     
-  }
+  return select1(p.lead());
+}
+
+int
+ReductionStrategy::select1(const Monomial& m) const {
+  MonomialSet ms(leadingTerms.divisorsOf(m));
+  return minimum(ms.expBegin(), ms.expEnd(), StratComparerForSelect(*this));
+}
+
+Polynomial
+ReductionStrategy::reducedNormalForm(const Polynomial& p) const {
   
-}
-int ReductionStrategy::select1(const Monomial& m) const {
-  MonomialSet ms=leadingTerms.divisorsOf(m);
-  if (ms.isZero())
-    return -1;
-  else {
-    //Monomial min=*(std::min_element(ms.begin(),ms.end(), LessWeightedLengthInStrat(strat)));
-    Exponent min=*(std::min_element(ms.expBegin(),ms.expEnd(), StratComparerForSelect(*this)));
-    return exp2Index.find(min)->second;
-  }
+  return red_tail(*this, headNormalForm(p));
 }
 
-Polynomial ReductionStrategy::reducedNormalForm(Polynomial p) const{
-    if UNLIKELY(p.isZero()) return p;
+Polynomial
+ReductionStrategy::headNormalForm(const Polynomial& p) const {
+  if PBORI_UNLIKELY(p.isZero()) return p;
     
-    Polynomial res(p.ring());
-    if (p.ring().ordering().isDegreeOrder()) res=nf3_degree_order(*this,p,p.lead());
-    else res=nf3(*this,p,p.lead());
-    if ((res.isZero())) return res;
-    res=red_tail(*this,res);
-    return res;
+  return (p.ring().ordering().isDegreeOrder()?
+	  nf3_degree_order(*this, p, p.lead()): nf3(*this, p, p.lead()));
 }
-Polynomial ReductionStrategy::headNormalForm(Polynomial p) const{
-    if UNLIKELY(p.isZero()) return p;
-    
-    Polynomial res(p.ring());
-    if (p.ring().ordering().isDegreeOrder()) res=nf3_degree_order(*this,p,p.lead());
-    else res=nf3(*this,p,p.lead());
-    return res;
+
+
+void ReductionStrategy::llReduceAll() {
+  Exponent ll_e = *(llReductor.expBegin());
+  const_iterator start(begin()), finish(end());
+  for(; start != finish; ++start)
+    llReduce(*start, ll_e);
 }
-Polynomial ReductionStrategy::nf(Polynomial p) const{
-    if (optRedTail) return reducedNormalForm(p);
-    else return headNormalForm(p);
+
+void ReductionStrategy::llReduce(const PolyEntry& entry, const Exponent& ll_e){
+
+  if ((entry.minimal) && (ll_e.GCD(entry.tailVariables).deg() > 0)) {
+    Polynomial tail = ll_red_nf(entry.tail, llReductor);
+    if (tail != entry.tail) {
+      operator()(entry) = tail + entry.lead;
+      monomials.update(entry);
+    }
+  }
 }
 
 END_NAMESPACE_PBORIGB

@@ -69,7 +69,7 @@ public:
     // by checked_idx_type idx should always be <= max(int) (== blockEnd() - 1)
     PBORI_ASSERT(idx <= *(blockEnd() - 1));
 
-    if UNLIKELY((idx >= CTypes::max_index()) || (idx <= *(blockEnd() - 2)))
+    if PBORI_UNLIKELY((idx >= CTypes::max_index()) || (idx <= *(blockEnd() - 2)))
       throw std::runtime_error("Blocks must be positive and have to be "
                                "added in a strictly increasing order.");
 
@@ -91,7 +91,7 @@ public:
     CacheManager<order_lead_tag> cache_mgr(poly.ring());
     typename base_type::descending_property descending;
 
-    return monom(  dd_block_degree_lead(cache_mgr, blockDegCache, 
+    return base_type::monom( dd_block_degree_lead(cache_mgr, blockDegCache, 
                                         poly.navigation(), m_indices.begin(),
                                         set_type(poly.ring()), descending) );
   }

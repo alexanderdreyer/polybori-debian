@@ -1,9 +1,9 @@
 Source: polybori
 Section: math
 Priority: extra
-Maintainer: Tim Abbott <tabbott@mit.edu>
+Maintainer: Alexander Dreyer <adreyer@gmx.de>
 Homepage: http://polybori.sourceforge.net/
-Build-Depends: @cdbs@, scons, python-setuptools, libboost-dev, libboost-python-dev (>=1.33), doxygen (>= 1.4.6), tex4ht, python-all-dev (>= 2.3.5-11), python-central (>= 0.5.6)
+Build-Depends: @cdbs@, scons, python-setuptools, libboost-dev (>=1.33), libboost-python-dev (>=1.33), doxygen (>= 1.4.6), tex4ht, python-all-dev (>= 2.3.5-11), python-central (>= 0.5.6)
 XS-Python-Version: all
 Standards-Version: 3.7.3
 
@@ -27,7 +27,7 @@ Description: Polynomials over Boolean Rings, Python module
 Package: libpolybori-dev
 Section: libdevel
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, libpolybori-0.4.0-0
+Depends: ${shlibs:Depends}, ${misc:Depends}, libpolybori-$PBVERSION.$PBRELEASE-0
 Description: Polynomials over Boolean Rings, development files
  The core of PolyBoRi is a C++ library, which provides high-level data
  types for Boolean polynomials and monomials, exponent vectors, as

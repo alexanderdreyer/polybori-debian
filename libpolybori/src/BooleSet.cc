@@ -112,6 +112,21 @@ BooleSet::expEnd() const {
   return exp_iterator(navigator(), ring());
 }
 
+// Start of iteration over exponent vectors
+BooleSet::reverse_exp_iterator 
+BooleSet::rExpBegin() const {
+
+  PBORI_TRACE_FUNC( "BooleSet::rExpBegin() const" );
+  return reverse_exp_iterator(base::navigation(), base::ring());
+}
+
+// Finish of iteration over monomials
+BooleSet::reverse_exp_iterator 
+BooleSet::rExpEnd() const {
+
+  PBORI_TRACE_FUNC( "BooleSet::rExpEnd() const" );
+  return reverse_exp_iterator(navigator(), ring());
+}
 
 // Get last term (wrt. lexicographical order)
 BooleSet::term_type
@@ -119,7 +134,7 @@ BooleSet::lastLexicographicalTerm() const {
 
   PBORI_TRACE_FUNC( "BooleSet::lastTerm() const" );
 
-  if UNLIKELY(isZero())
+  if PBORI_UNLIKELY(isZero())
     throw PBoRiError(CTypes::illegal_on_zero);
 
   return dd_last_lexicographical_term(*this, type_tag<term_type>());
@@ -203,7 +218,13 @@ BooleSet::minimalElements() const {
 // Division by given term
 BooleSet
 BooleSet::divide(const term_type& rhs) const {
-  return self(base::divideFirst(rhs.diagram()));
+
+  typedef CCacheManagement<ring_type, CCacheTypes::divide>
+    cache_mgr_type;
+
+  return dd_divide_recursively(cache_mgr_type(ring()), 
+                               navigation(), rhs.set().navigation(),
+                               self(ring()));
 }
 
 // Set of variables of the set
