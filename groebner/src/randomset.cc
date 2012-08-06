@@ -4,19 +4,27 @@
 //  Created by  on 2007-12-13.
 //  Copyright (c) 2007 The PolyBoRi Team. See LICENSE file.
 //  PolyBoRi Project
-#include "randomset.h"
+#include <polybori/groebner/randomset.h>
 
 #include <ctime> 
 #include <set>
-#include "nf.h"
+#include <polybori/groebner/nf.h>
+#include <polybori/groebner/add_up.h>
+#include <polybori/groebner/ExpLexLess.h>
+
 BEGIN_NAMESPACE_PBORIGB
 static base_generator_type generator(static_cast<unsigned int>(std::time(0)));
+
+void set_random_seed(unsigned int seed){
+    generator=base_generator_type(seed);
+}
+
 
 MonomialSet random_set_using_generator(const Monomial& variables, unsigned int len, bool_gen_type& bit_gen){
     Exponent var_exp=variables.exp();
 
     
-    std::set<Exponent> exponents;
+    std::set<Exponent, ExpLexLess> exponents;
     while(exponents.size()<len){
         Exponent new_exp;
         Exponent::const_iterator it=var_exp.begin();
@@ -30,7 +38,7 @@ MonomialSet random_set_using_generator(const Monomial& variables, unsigned int l
     }
     std::vector<Exponent> exponents_vec(exponents.size());
     std::copy(exponents.begin(),exponents.end(),exponents_vec.begin());
-    Polynomial p=add_up_exponents(exponents_vec);
+    Polynomial p=add_up_exponents(exponents_vec, variables.ring().zero());
     return p.diagram();
 }
 MonomialSet random_set(const Monomial& variables, unsigned int len){

@@ -88,23 +88,25 @@ ideal do_lex_gb(ideal s, bool generate_fe=true, bool use_singular_options=true){
     Polynomial pb_p=sing2pb(p,currRing);
     strat.addGeneratorDelayed(pb_p);
   }
-  if (use_singular_options){
-    if (TEST_OPT_REDTAIL){
-      strat.optRedTail=true;
-    } else
-    strat.optRedTail=false;
-    if (K_TEST_OPT_REDTHROUGH){
-      strat.optLazy=true;
-    } else
-    strat.optLazy=false;
-  }
+  /* todo; options */
+/*   if (use_singular_options){ */
+/*     if (TEST_OPT_REDTAIL){ */
+/*       strat.optRedTail=true; */
+/*     } else */
+/*     strat.optRedTail=false; */
+/*     if (K_TEST_OPT_REDTHROUGH){ */
+/*       strat.optLazy=true; */
+/*     } else */
+/*     strat.optLazy=false; */
+/*   } */
   //todo: deg_bound
   strat.symmGB_F2();
   std::vector<Polynomial> res_pb;
-  if ((use_singular_options)&&(!(TEST_OPT_REDSB)))
+
+  //  if ((use_singular_options)&&(!(TEST_OPT_REDSB)))
    res_pb=strat.minimalize();
-  else
-   res_pb=strat.minimalizeAndTailReduce();
+   //  else
+   //   res_pb=strat.minimalizeAndTailReduce();
   i_size=res_pb.size();
   
   bool contains_one=false;

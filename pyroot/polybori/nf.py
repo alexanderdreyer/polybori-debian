@@ -1,6 +1,8 @@
 from polybori.PyPolyBoRi import *
+from polybori.easy_polynomials import easy_linear_polynomials as easy_linear_polynomials_func
 from polybori.statistics import used_vars_set
 from random import Random
+from warnings import warn
 import copy
 import sys
 from exceptions import NotImplementedError
@@ -13,48 +15,21 @@ class GeneratorLimitExceeded(Exception):
         
         
         
-def myspoly(f,g):
-    """only for the profiler to be noticed"""
-    return spoly(f,g)
-    
-
-def lm_tuple(f):
-    if isinstance(f,Polynomial):
-        f=f.lead()
-  
-    res=tuple(f)
-    
-    return res
-def product_criterion(f,g):
-    f=set(lm_tuple(f))
-    g=set(lm_tuple(g))
-    if len(f.intersection(g))==0:
-        return True
-    else:
-        return False
-def update_cache2(h,cache):
-    (LG,LGM)=cache
-    lead=h.lead()
-    l=lm_tuple(lead)
-    LGM[l]=h
-    LG=LG.union(lead.set())
-    return (LG,LGM)
 
 
-matrix_prefix="hfe30_"
-print_matrices=False
+
 #used_polynomials=list()
 
 def pkey(p):
     return (p[0],len(p))
 mat_counter=0
-def build_and_print_matrices(v,strat): 
+def build_and_print_matrices(v,strat):
+    """"old solution using PIL, the currently used implementation is done in C++
+    and plots the same matrices, as being calculated"""
     treated=BooleSet()
     v=list(v)
     rows=0
     polys_in_mat=[]
-    #v_orig=list(v)
-    #print v
     if len(v)==0:
         return
     while(len(v)>0):
@@ -68,7 +43,7 @@ def build_and_print_matrices(v,strat):
                 i=strat.select(m)
                 if i>=0:
                     p2=strat[i]
-                    p2=p2*(m/p2.lead())
+                    p2=p2*(m//p2.lead())
                     v.append(p2)
         polys_in_mat.append(p)
         treated=treated.union(p.set())
@@ -103,49 +78,27 @@ def build_and_print_matrices(v,strat):
 
     print "MATRIX_SIZE:", rows,"x",cols
     
-   
-def sum_terms(terms):
-    l=len(terms)
-    if l==0:
-        return Polynomial(0)
-    if l==1:
-        return Polynomial(terms[0])
-    if l==2:
-        return Polynomial(terms[1]+terms[0])
-    s=l/2
-    return sum_terms(terms[:s])+sum_terms(terms[s:])
-def noro_step(polys,strat):
-    def nf(p,strat):
-        if p.isZero():
-            return p
-        else:
-            return nf3(strat,p,p.lead())
-    llReductor=strat.llReductor
-    polys=[nf(ll_red_nf_redsb(p,llReductor),strat) for p  in polys]
-    polys=[strat.redTail(p) for p in polys if not p.isZero()]
-    terms=BooleSet()
-    for p in polys:
-        terms=terms.union(p.set())
-    terms=list(BooleSet(terms))
-    terms.sort(reverse=True)
-    i2term=list(enumerate(terms))
-    term2i=dict(((i,j) for (j,i) in i2term))
-    i2term=dict(i2term)
-    rows=len(polys)
-    cols=len(terms)
-    m=createMatGF2(rows,cols)
-    for (i,p) in enumerate(polys):
-        for t in BooleSet(p.set()):
-            j=term2i[t]
-            m[i,j]=1
-    rank=m.gauss()
+def multiply_polynomials(l, ring):
+    """
+    >>> r=Ring(1000)
+    >>> x=r.variable
+    >>> multiply_polynomials([x(3), x(2)+x(5)*x(6), x(0), x(0)+1], r)
+    0
+    """
+    l=[Polynomial(p) for p in l]
+    def sort_key(p):
+        return p.navigation().value()
+    l=sorted(l, key=sort_key)
+    res=Polynomial(ring.one())
+    for p in l:
+        res=p*res
+    return res
     
-    polys=[sum_terms([i2term[j] for j in xrange(cols) if m[i,j]]) for i in xrange(rank)]
-
-    return polys
-
+        
+    
+    
 def build_and_print_matrices_deg_colored(v,strat):
-    
+    """old PIL solution using a different color for each degree"""
     if len(v)==0:
         return
     
@@ -164,7 +117,7 @@ def build_and_print_matrices_deg_colored(v,strat):
                 i=strat.select(m)
                 if i>=0:
                     p2=strat[i]
-                    p2=p2*(m/p2.lead())
+                    p2=p2*(m//p2.lead())
                     v.append(p2)
         polys_in_mat.append(p)
         treated=treated.union(p.set())
@@ -197,13 +150,65 @@ def build_and_print_matrices_deg_colored(v,strat):
     
     print "MATRIX_SIZE:", rows,"x",cols   
 
-def symmGB_F2_python(G,deg_bound=1000000000000,over_deg_bound=0, use_faugere=False,use_noro=False,optLazy=True,optRedTail=True, max_growth=2.0, step_factor=1.0, implications=False, prot=False, full_prot=False,selection_size=1000, optExchange=True, optAllowRecursion=False,ll=False,optLinearAlgebraInLastBlock=True, max_generators=None):
-    #if use_noro:
-    #    raise NotImplementedError
+def high_probability_polynomials_trick(p, strat):
+    lead_deg=p.lead_deg()
+    if lead_deg<=4:
+        return
+    
+    ring =p.ring()
+    factor=multiply_polynomials(easy_linear_factors(p), ring)
+    p=p/factor
+    
+    #again, do it twice, it's cheap
+    lead_deg=p.lead_deg()
+    if lead_deg<=3:
+        return
+    
+    if lead_deg>9:
+        return
+    uv=p.vars_as_monomial()
+        
+    candidates=[]
+    
+    if uv.deg()<=4:
+        return
+    
+    if not uv.deg()<=lead_deg+1:
+        return
+        
+    space=uv.divisors()
+    
+    lead=p.lead()
+    for v in lead.variables():
+        variable_selection=lead//v
+        vars_reversed=reversed(list(variable_selection.variables()))
+        #it's just a way to loop over the cartesian product
+        for assignment in variable_selection.divisors():
+            c_p=assignment
+            for v in vars_reversed:
+                if not assignment.reducible_by(v):
+                    c_p=(v+1) * c_p
+                    
+            points=(c_p+1).zeros_in(space)
+            if p.zeros_in(points).empty():
+                candidates.append(c_p*factor)
+        #there many more combinations depending on plugged in values
+    for c in candidates:
+        strat.add_as_you_wish(c)
+    
+        
+def symmGB_F2_python(G,deg_bound=1000000000000,over_deg_bound=0, use_faugere=False,
+    use_noro=False,opt_lazy=True,opt_red_tail=True,
+    max_growth=2.0, step_factor=1.0,
+    implications=False, prot=False,
+    full_prot=False,selection_size=1000,
+    opt_exchange=True,
+    opt_allow_recursion=False,ll=False,
+    opt_linear_algebra_in_last_block=True, max_generators=None, red_tail_deg_growth=True, matrix_prefix='mat', modified_linear_algebra=True, draw_matrices=False, easy_linear_polynomials=True):
     if use_noro and use_faugere:
-        raise Exception
+        raise ValueError, 'both use_noro and use_faugere specified'
     def add_to_basis(strat,p):
-        if p.isZero():
+        if p.is_zero():
             if prot:
                 print "-"
         else:
@@ -211,8 +216,17 @@ def symmGB_F2_python(G,deg_bound=1000000000000,over_deg_bound=0, use_faugere=Fal
                 if full_prot:
                     print p
                 print "Result: ", "deg:", p.deg(), "lm: ", p.lead(), "el: ", p.elength()
-            strat.addAsYouWish(p)
-            
+            if easy_linear_polynomials and p.lead_deg()>2:
+                lin=easy_linear_polynomials_func(p)
+                for q in lin:
+                    strat.add_generator_delayed(q)
+            old_len=len(strat)
+            strat.add_as_you_wish(p)
+            new_len=len(strat)
+            if new_len==1+old_len:
+                high_probability_polynomials_trick(p, strat)
+                
+
             if prot:
                 print "#Generators:", len(strat)
     
@@ -220,107 +234,130 @@ def symmGB_F2_python(G,deg_bound=1000000000000,over_deg_bound=0, use_faugere=Fal
         if len(G)==0:
             return []
         G=[Polynomial(g) for g in G]  
-        strat=GroebnerStrategy()
-        strat.optRedTail=optRedTail
-        strat.optLazy=optLazy
-        strat.optExchange=optExchange
-        strat.optAllowRecursion=optAllowRecursion
-        strat.enabledLog=prot
-        strat.optLL=ll
-        strat.optLinearAlgebraInLastBlock=optLinearAlgebraInLastBlock
-        strat.redByReduced=False#True
+        current_ring = G[0].ring()
+        strat=GroebnerStrategy(current_ring)
+        strat.reduction_strategy.opt_red_tail=opt_red_tail
+        strat.opt_lazy=opt_lazy
+        strat.opt_exchange=opt_exchange
+        strat.opt_allow_recursion=opt_allow_recursion
+        strat.enabled_log=prot
+        strat.reduction_strategy.opt_ll=ll
+        strat.opt_modified_linear_algebra=modified_linear_algebra
+        strat.opt_linear_algebra_in_last_block=opt_linear_algebra_in_last_block
+        strat.opt_red_by_reduced=False#True
+        strat.reduction_strategy.opt_red_tail_deg_growth=red_tail_deg_growth
         
+        strat.opt_draw_matrices = draw_matrices
+        strat.matrix_prefix = matrix_prefix
 
         for g in  G:
-            if not g.isZero():
-                strat.addGeneratorDelayed(g)
+            if not g.is_zero():
+                strat.add_generator_delayed(g)
     else:
         strat=G
         
     if prot:
         print "added delayed"
     i=0
-    while strat.npairs()>0:
-        if max_generators and len(strat)>max_generators:
-            raise GeneratorLimitExceeded(strat)
-        i=i+1
-        if prot:
-            print "Current Degree:", strat.topSugar()
-        if (strat.topSugar()>deg_bound) and (over_deg_bound<=0):
-            return strat
-        if (strat.topSugar()>deg_bound):
-            ps=strat.someSpolysInNextDegree(over_deg_bound)
-            over_deg_bound-=len(ps)
-        else:
-            ps=strat.someSpolysInNextDegree(selection_size)
-            
-        if prot:
-            print "(", strat.npairs(), ")"
-        if prot:
-            print "start reducing"
-            print "Chain Crit. : ",strat.chainCriterions, "VC:",strat.variableChainCriterions,\
-            "EASYP",strat.easyProductCriterions,"EXTP",strat.extendedProductCriterions
-            print len(ps), "spolys added"
-            
-        if use_noro or use_faugere:
-             #res=noro_step(ps,strat)
-             v=BoolePolynomialVector()
-
-             for p in ps:
-                    if not p.isZero():
-                        v.append(p)
-             if print_matrices:
-                 build_and_print_matrices(v,strat)
-             if use_noro:
-                 res=strat.noroStep(v)
-             else:
-                 res=strat.faugereStepDense(v)
-            
-        else:
-            v=BoolePolynomialVector()
-            for p in ps:
-                #print p
-                p=Polynomial(mod_mon_set(BooleSet(p.set()),strat.monomials))
-                #p=ll_red_nf(p,strat.llReductor)
-                if not p.isZero():
-                    v.append(p)
-            if print_matrices:
-                build_and_print_matrices(v,strat)
-            if len(v)>100:
-               res=parallel_reduce(v,strat,int(step_factor*10),max_growth)
-            else:
-               if len(v)>10:
-                  res=parallel_reduce(v,strat,int(step_factor*30),max_growth)
-               else:
-                  res=parallel_reduce(v,strat,int(step_factor*100), max_growth)
-        
-        #red.reduce()
-        if prot:
-            print "end reducing"
-        #res=red.result
-        def sort_key(p):
-            return p.lead()
-        res_cp=sorted(res, key=sort_key)
-        #res_cp=list(res)
-        #res_cp.reverse()
-        old_ll=strat.llReductor
-        for p in  res_cp:
-            old_len=len(strat)
-            add_to_basis(strat,p)
-            if implications and old_len==len(strat)-1:
-                strat.implications(len(strat)-1)
-            if p.isOne():
-                #strat.toStdOut()
-                if prot:
-                    print "GB is 1"
+    try:
+        while strat.npairs()>0:
+            if max_generators and len(strat)>max_generators:
+                raise GeneratorLimitExceeded(strat)
+            i=i+1
+            if prot:
+                print "Current Degree:", strat.top_sugar()
+            if (strat.top_sugar()>deg_bound) and (over_deg_bound<=0):
                 return strat
+            if (strat.top_sugar()>deg_bound):
+                ps=strat.some_spolys_in_next_degree(over_deg_bound)
+                over_deg_bound-=len(ps)
+            else:
+                ps=strat.some_spolys_in_next_degree(selection_size)
+            
+            if ps and ps[0].ring().has_degree_order():
+                ps=[strat.reduction_strategy.cheap_reductions(p) for p in ps]
+                ps=[p for p in ps if not p.is_zero()]
+                if len(ps)>0:
+                    min_deg=min((p.deg() for p in ps))
+                new_ps=[]
+                for p in ps:
+                    if p.deg()<=min_deg:
+                        new_ps.append(p)
+                    else:
+                        strat.add_generator_delayed(p)
+                ps=new_ps
+            
             if prot:
                 print "(", strat.npairs(), ")"
-        new_ll=strat.llReductor
+            if prot:
+                print "start reducing"
+                print "Chain Crit. : ",strat.chain_criterions, "VC:",strat.variable_chain_criterions,\
+                "EASYP",strat.easy_product_criterions,"EXTP",strat.extended_product_criterions
+                print len(ps), "spolys added"
+            
+            if use_noro or use_faugere:
+                 v=BoolePolynomialVector()
 
-        strat.cleanTopByChainCriterion()
-    #strat.toStdOut()
-    return strat
+                 for p in ps:
+                        if not p.is_zero():
+                            v.append(p)
+                 if use_noro:
+                     res=strat.noro_step(v)
+                 else:
+                     res=strat.faugere_step_dense(v)
+            
+            else:
+                v=BoolePolynomialVector()
+                for p in ps:
+                    p=Polynomial(
+                        mod_mon_set(
+                        BooleSet(p.set()),strat.reduction_strategy.monomials))
+                    if not p.is_zero():
+                        v.append(p)
+                if len(v)>100:
+                   res=parallel_reduce(v,strat,int(step_factor*10),max_growth)
+                else:
+                   if len(v)>10:
+                      res=parallel_reduce(v,strat,int(step_factor*30),max_growth)
+                   else:
+                      res=parallel_reduce(v,strat,int(step_factor*100), max_growth)
+            
+            if prot:
+                print "end reducing"
+            
+
+            if len(res)>0 and res[0].ring().has_degree_order():
+                res_min_deg=min([p.deg() for p in res])
+                new_res = []
+                for p in res:
+                    if p.deg()==res_min_deg:
+                        new_res.append(p)
+                    else:
+                        strat.add_generator_delayed(p)
+                res = new_res
+            def sort_key(p):
+                return p.lead()
+            res_cp=sorted(res, key=sort_key)
+
+
+            for p in  res_cp:
+                old_len=len(strat)
+                add_to_basis(strat,p)
+                if implications and old_len==len(strat)-1:
+                    strat.implications(len(strat)-1)
+                if p.is_one():
+                    if prot:
+                        print "GB is 1"
+                    return strat
+                if prot:
+                    print "(", strat.npairs(), ")"
+
+
+            strat.clean_top_by_chain_criterion()
+        return strat
+    except KeyboardInterrupt:
+        #return strat
+        raise
 
 def GPS(G,vars_start, vars_end):
     def step(strat,trace,var,val):
@@ -328,10 +365,10 @@ def GPS(G,vars_start, vars_end):
         print "npairs", strat.npairs()
         strat=GroebnerStrategy(strat)
         print "npairs", strat.npairs()
-        strat.addGeneratorDelayed(Polynomial(Monomial(Variable(var))+val))
+        strat.add_generator_delayed(Polynomial(Monomial(Variable(var, strat.r))+val))
         strat=symmGB_F2_python(strat,prot=True,deg_bound=2, over_deg_bound=10)
         if var<=vars_start:
-            strat=symmGB_F2_python(strat, prot=True, optLazy=False, redTail=False)
+            strat=symmGB_F2_python(strat, prot=True, opt_lazy=False, redTail=False)
         if strat.containsOne():
             pass
         else:
@@ -350,11 +387,12 @@ def GPS(G,vars_start, vars_end):
             var=var-1
         step(strat, trace, var, 0)
         step(strat, trace, var, 1)
-    strat=GroebnerStrategy()
-    #strat.addGenerator(G[0])
-    for g in G[:]:
-        strat.addGeneratorDelayed(g)
-    branch(strat,[],vars_end-1)
+    if G:
+        strat=GroebnerStrategy(G[0].ring())
+        #strat.add_generator(G[0])
+        for g in G[:]:
+            strat.add_generator_delayed(g)
+        branch(strat,[],vars_end-1)
 
 
 
@@ -370,12 +408,12 @@ def GPS_with_proof_path(G,proof_path, deg_bound,over_deg_bound):
         plug_p_lead=plug_p.lead()
         if len(plug_p)==2 and (plug_p+plug_p_lead).deg()==0:
             for v in plug_p_lead:
-                strat.addGeneratorDelayed(v+1)
+                strat.add_generator_delayed(v+1)
         else:
-            strat.addGeneratorDelayed(plug_p)
+            strat.add_generator_delayed(plug_p)
         print "npairs", strat.npairs()
         print "pos:", pos
-        strat=symmGB_F2_python(strat,deg_bound=deg_bound, optLazy=False,over_deg_bound=over_deg_bound,prot=True)
+        strat=symmGB_F2_python(strat,deg_bound=deg_bound, opt_lazy=False,over_deg_bound=over_deg_bound,prot=True)
         print "npairs", strat.npairs()
         pos=pos+1
         if pos>=len(proof_path):
@@ -387,7 +425,7 @@ def GPS_with_proof_path(G,proof_path, deg_bound,over_deg_bound):
             if pos>=len(proof_path):
                 print "npairs", strat.npairs()
                 print "minimized:"
-                for p in strat.minimalizeAndTailReduce():
+                for p in strat.minimalize_and_tail_reduce():
                     print p
                 #bug: may contain Delayed polynomials
                 print "!!!!!!! SOLUTION",trace
@@ -400,15 +438,15 @@ def GPS_with_proof_path(G,proof_path, deg_bound,over_deg_bound):
         
         step(strat, trace,  proof_path, pos, 0)
         step(strat, trace,  proof_path, pos, 1)
-    strat=GroebnerStrategy()
-    strat.addGenerator(Polynomial(G[0]))
+    strat=GroebnerStrategy(G[0].ring())
+    strat.add_generator(Polynomial(G[0]))
     for g in G[1:]:
-        strat.addGeneratorDelayed(Polynomial(g))
+        strat.add_generator_delayed(Polynomial(g))
     branch(strat,[], proof_path, 0)
 
 
 
-def GPS_with_suggestions(G,deg_bound,over_deg_bound, optLazy=True,optRedTail=True,initial_bb=True):
+def GPS_with_suggestions(G,deg_bound,over_deg_bound, opt_lazy=True,opt_red_tail=True,initial_bb=True):
     def step(strat,trace, var,val):
         print trace
         plug_p=val+var
@@ -418,10 +456,10 @@ def GPS_with_suggestions(G,deg_bound,over_deg_bound, optLazy=True,optRedTail=Tru
  
 
         
-        strat.addGeneratorDelayed(plug_p)
+        strat.add_generator_delayed(plug_p)
         print "npairs", strat.npairs()
         
-        strat=symmGB_F2_python(strat,deg_bound=deg_bound,optLazy=optLazy,over_deg_bound=over_deg_bound,prot=True)
+        strat=symmGB_F2_python(strat,deg_bound=deg_bound,opt_lazy=opt_lazy,over_deg_bound=over_deg_bound,prot=True)
         
         #pos=pos+1
         if not strat.containsOne():
@@ -432,7 +470,7 @@ def GPS_with_suggestions(G,deg_bound,over_deg_bound, optLazy=True,optRedTail=Tru
         index=strat.suggestPluginVariable();
         if index<0:
             uv=set(used_vars_set(strat))
-            lv=set([iter(p.lead()).next().index() for p in strat if p.lmDeg()==1])
+            lv=set([iter(p.lead()).next().index() for p in strat if p.lead_deg()==1])
             candidates=uv.difference(lv)
             if len(candidates)>0:
                 index=iter(candidates).next().index()
@@ -446,19 +484,21 @@ def GPS_with_suggestions(G,deg_bound,over_deg_bound, optLazy=True,optRedTail=Tru
             if not strat.containsOne():
                 print "TRACE", trace
                 print "SOLUTION"
-                for p in strat.minimalizeAndTailReduce():
+                for p in strat.minimalize_and_tail_reduce():
                     print p
                 raise Exception
     def sort_crit(p):
         #return (p.deg(),p.lead(),p.elength())
         return (p.lead(),p.deg(),p.elength())
-    strat=GroebnerStrategy()
-    strat.optRedTail=optRedTail#True
-    strat.optExchange=False
-    strat.optAllowRecursion=False
-    #strat.optRedTailDegGrowth=False
-    strat.optLazy=optLazy
-    #strat.optLazy=True
+    if not G:
+        return 
+    strat=GroebnerStrategy(G[0].ring())
+    strat.reduction_strategy.opt_red_tail=opt_red_tail#True
+    strat.opt_exchange=False
+    strat.opt_allow_recursion=False
+    #strat.opt_red_tail_deg_growth=False
+    strat.opt_lazy=opt_lazy
+    #strat.opt_lazy=True
     first_deg_bound=1
     G=[Polynomial(p) for p in G]
     G.sort(key=sort_crit)
@@ -468,17 +508,17 @@ def GPS_with_suggestions(G,deg_bound,over_deg_bound, optLazy=True,optRedTail=Tru
           print g
           index=strat.select(g.lead())
           if p.deg()==1:#(index<0):
-              strat.addAsYouWish(g)
+              strat.add_as_you_wish(g)
           else:
               first_deg_bound=max(first_deg_bound,g.deg())
-              strat.addGeneratorDelayed(g)
+              strat.add_generator_delayed(g)
           print g,len(strat)
     else:
       for g in G:
-        strat.addAsYouWish(g)
+        strat.add_as_you_wish(g)
     if initial_bb:
-      strat=symmGB_F2_python(strat,deg_bound=max(deg_bound,first_deg_bound), optLazy=optLazy,over_deg_bound=0,prot=True)
-    strat.optLazy=optLazy
+      strat=symmGB_F2_python(strat,deg_bound=max(deg_bound,first_deg_bound), opt_lazy=opt_lazy,over_deg_bound=0,prot=True)
+    strat.opt_lazy=opt_lazy
     print "INITIALIZED"
     branch(strat,[])
 
@@ -494,7 +534,7 @@ def GPS_with_non_binary_proof_path(G,proof_path, deg_bound,over_deg_bound):
         print "npairs", strat.npairs()
         for p in proof_path[pos][choice]:
             print p
-            strat.addGeneratorDelayed(Polynomial(p))
+            strat.add_generator_delayed(Polynomial(p))
  
         print "npairs", strat.npairs()
         print "pos:", pos
@@ -509,10 +549,10 @@ def GPS_with_non_binary_proof_path(G,proof_path, deg_bound,over_deg_bound):
         else:
             if pos>=len(proof_path):
                 print "npairs", strat.npairs()
-                strat.toStdOut()
+                #strat.to_std_out()
                 l=[p for p in strat]
                 strat2=symmGB_F2_python(l)
-                strat2.toStdOut()
+                #strat2.to_std_out()
                 #bug: may contain Delayed polynomials
                 print "!!!!!!! SOLUTION",trace
                 raise Exception
@@ -527,13 +567,23 @@ def GPS_with_non_binary_proof_path(G,proof_path, deg_bound,over_deg_bound):
         for i in xrange(len(proof_path[pos])):
             step(strat, trace,  proof_path, pos, i)
  
-    strat=GroebnerStrategy()
-    strat.addGenerator(G[0])
+    strat=GroebnerStrategy(G[0].ring())
+    strat.add_generator(G[0])
     for g in G[1:]:
-        strat.addGeneratorDelayed(g)
+        strat.add_generator_delayed(g)
     branch(strat,[], proof_path, 0)
 
-def symmGB_F2_C(G,optExchange=True,deg_bound=1000000000000,optLazy=False,over_deg_bound=0, optRedTail=True, max_growth=2.0, step_factor=1.0, implications=False, prot=False, full_prot=False,selection_size=1000, optAllowRecursion=False, use_noro=False,use_faugere=False,ll=False,optLinearAlgebraInLastBlock=True,max_generators=None):
+def symmGB_F2_C(G,opt_exchange=True,
+    deg_bound=1000000000000,opt_lazy=False,
+    over_deg_bound=0, opt_red_tail=True,
+    max_growth=2.0, step_factor=1.0,
+    implications=False, prot=False,
+    full_prot=False,selection_size=1000,
+    opt_allow_recursion=False, use_noro=False,use_faugere=False,
+    ll=False,opt_linear_algebra_in_last_block=True,
+    max_generators=None, red_tail_deg_growth=True, 
+    modified_linear_algebra=True, matrix_prefix="",
+    draw_matrices=False):
     #print implications
     if use_noro:
         raise NotImplementedError, "noro not implemented for symmgb"    
@@ -544,16 +594,20 @@ def symmGB_F2_C(G,optExchange=True,deg_bound=1000000000000,optLazy=False,over_de
             
         
         G=[Polynomial(g) for g in G]    
-        strat=GroebnerStrategy()
-        strat.optRedTail=optRedTail
-        strat.enabledLog=prot
-        strat.optLazy=optLazy
-        strat.optExchange=optExchange
-        strat.optLL=ll
-        strat.optAllowRecursion=optAllowRecursion
-        strat.optLinearAlgebraInLastBlock=optLinearAlgebraInLastBlock
-        strat.enabledLog=prot
-        #strat.addGenerator(G[0])
+        strat=GroebnerStrategy(G[0].ring())
+        strat.reduction_strategy.opt_red_tail=opt_red_tail
+        strat.enabled_log=prot
+        strat.opt_lazy=opt_lazy
+        strat.opt_exchange=opt_exchange
+        strat.reduction_strategy.opt_ll=ll
+        strat.opt_allow_recursion=opt_allow_recursion
+        strat.opt_linear_algebra_in_last_block=opt_linear_algebra_in_last_block
+        strat.enabled_log=prot
+        strat.opt_modified_linear_algebra=modified_linear_algebra
+        strat.matrix_prefix=matrix_prefix
+        strat.opt_draw_matrices=draw_matrices
+        strat.reduction_strategy.opt_red_tail_deg_growth=red_tail_deg_growth
+        #strat.add_generator(G[0])
         
         
         strat.redByReduced=False#True
@@ -561,7 +615,38 @@ def symmGB_F2_C(G,optExchange=True,deg_bound=1000000000000,optLazy=False,over_de
         #if PROT:
         #    print "added first"
         for g in G:#[1:]:
-            if not g.isZero():
-                strat.addGeneratorDelayed(g)
+            if not g.is_zero():
+                strat.add_generator_delayed(g)
     strat.symmGB_F2()
     return strat
+
+
+def normal_form(poly, ideal, reduced=True):
+    """ Simple normal form computation of a polynomial  against an ideal.
+    >>> from polybori import declare_ring, normal_form
+    >>> r=declare_ring(['x','y'], globals())
+    >>> normal_form(x+y, [y],reduced=True)
+    x
+    >>> normal_form(x+y,[x,y])
+    0
+    """
+    ring=poly.ring()
+    strat = ReductionStrategy(ring)
+    strat.opt_red_tail=reduced
+    ideal=[Polynomial(p) for p in ideal if p!=0]
+    ideal= sorted(ideal, key=Polynomial.lead)
+    last=None
+    for p in ideal:
+        if p.lead()!=last:
+            strat.add_generator(p)
+        else:
+            warn("%s will not used for reductions", p )
+        last=p.lead()
+    return strat.nf(poly)
+
+def _test():
+    import doctest
+    doctest.testmod()
+
+if __name__ == "__main__":
+    _test()

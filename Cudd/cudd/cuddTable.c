@@ -157,7 +157,9 @@ static void cuddRotateLeft (DdNodePtr *nodeP);
 static void cuddRotateRight (DdNodePtr *nodeP);
 static void cuddDoRebalance (DdNodePtr **stack, int stackN);
 #endif
+#ifdef CUDD_ORIG_INCLUSION
 static void ddPatchTree (DdManager *dd, MtrNode *treenode);
+#endif
 #ifdef DD_DEBUG
 static int cuddCheckCollisionOrdering (DdManager *unique, int i, int j);
 #endif
@@ -301,7 +303,7 @@ cuddAllocNode(
 		** as 4 pointers.  */
 		offset = (ptruint) mem & (sizeof(DdNode) - 1);
 		mem += (sizeof(DdNode) - offset) / sizeof(DdNodePtr);
-		assert(((ptruint) mem & (sizeof(DdNode) - 1)) == 0);
+		CUDD_ASSERT(((ptruint) mem & (sizeof(DdNode) - 1)) == 0);
 		list = (DdNode *) mem;
 
 		i = 1;
@@ -519,8 +521,10 @@ cuddInitTable(
     unique->countDead = ~0;
     unique->siftMaxVar = DD_SIFT_MAX_VAR;
     unique->siftMaxSwap = DD_SIFT_MAX_SWAPS;
+#ifdef CUDD_ORIG_INCLUSION
     unique->tree = NULL;
     unique->treeZ = NULL;
+#endif
     unique->groupcheck = CUDD_GROUP_CHECK7;
     unique->recomb = DD_DEFAULT_RECOMB;
     unique->symmviolation = 0;
@@ -618,8 +622,11 @@ cuddFreeTable(
 #ifndef DD_NO_DEATH_ROW
     FREE(unique->deathRow);
 #endif
+
+#ifdef CUDD_ORIG_INCLUSION
     if (unique->tree != NULL) Mtr_FreeTree(unique->tree);
     if (unique->treeZ != NULL) Mtr_FreeTree(unique->treeZ);
+#endif
     if (unique->linear != NULL) FREE(unique->linear);
     while (unique->preGCHook != NULL)
 	Cudd_RemoveHook(unique,unique->preGCHook->f,CUDD_PRE_GC_HOOK);
@@ -960,6 +967,7 @@ cuddGarbageCollect(
   SeeAlso     [cuddUniqueInterZdd]
 
 ******************************************************************************/
+#ifdef ORIG_CUDD
 DdNode *
 cuddZddGetNode(
   DdManager * zdd,
@@ -975,8 +983,8 @@ cuddZddGetNode(
     return(node);
 
 } /* end of cuddZddGetNode */
-
-
+#endif
+#ifdef CUDD_ORIG_INCLUSION
 /**Function********************************************************************
 
   Synopsis [Wrapper for cuddUniqueInterZdd that is independent of variable
@@ -1028,7 +1036,7 @@ cuddZddGetNodeIVO(
     return(r);
 
 } /* end of cuddZddGetNodeIVO */
-
+#endif
 
 /**Function********************************************************************
 
@@ -1047,6 +1055,7 @@ cuddZddGetNodeIVO(
   SeeAlso     [cuddUniqueInterZdd]
 
 ******************************************************************************/
+
 DdNode *
 cuddUniqueInter(
   DdManager * unique,
@@ -1068,15 +1077,18 @@ cuddUniqueInter(
 #endif
 
     if (index >= unique->size) {
-	if (!ddResizeTable(unique,index)) return(NULL);
+        if (!ddResizeTable(unique,index)) return(NULL);
     }
-
+#ifdef ORIG_CUDD
     level = unique->perm[index];
+#else
+    level=index;
+#endif
     subtable = &(unique->subtables[level]);
 
 #ifdef DD_DEBUG
-    assert(level < (unsigned) cuddI(unique,T->index));
-    assert(level < (unsigned) cuddI(unique,Cudd_Regular(E)->index));
+    CUDD_ASSERT(level < (unsigned) cuddI(unique,T->index));
+    CUDD_ASSERT(level < (unsigned) cuddI(unique,Cudd_Regular(E)->index));
 #endif
 
     pos = ddHash(T, E, subtable->shift);
@@ -1106,6 +1118,7 @@ cuddUniqueInter(
     }
 
     /* countDead is 0 if deads should be counted and ~0 if they should not. */
+#ifdef CUDD_ORIG_INCLUSION
     if (unique->autoDyn &&
     unique->keys - (unique->dead & unique->countDead) >= unique->nextDyn) {
 #ifdef DD_DEBUG
@@ -1124,6 +1137,7 @@ cuddUniqueInter(
 #endif
 	return(NULL);
     }
+#endif /* CUDD_ORIG_INCLUSION*/
 
     if (subtable->keys > subtable->maxKeys) {
         if (unique->gcEnabled &&
@@ -1204,7 +1218,7 @@ cuddUniqueInter(
 
 } /* end of cuddUniqueInter */
 
-
+#ifdef CUDD_ORIGINAL_INCLUSION
 /**Function********************************************************************
 
   Synopsis [Wrapper for cuddUniqueInter that is independent of variable
@@ -1240,7 +1254,7 @@ cuddUniqueInterIVO(
     Cudd_RecursiveDeref(unique, v);
     return(result);
 }
-
+#endif
 
 /**Function********************************************************************
 
@@ -1278,7 +1292,7 @@ cuddUniqueInterZdd(
     unique->uniqueLookUps++;
 #endif
 
-    if (index >= unique->sizeZ) {
+    if UNLIKELY(index >= unique->sizeZ) {
 	if (!cuddResizeTableZdd(unique,index)) return(NULL);
     }
 
@@ -1286,11 +1300,11 @@ cuddUniqueInterZdd(
     subtable = &(unique->subtableZ[level]);
 
 #ifdef DD_DEBUG
-    assert(level < (unsigned) cuddIZ(unique,T->index));
-    assert(level < (unsigned) cuddIZ(unique,Cudd_Regular(E)->index));
+    CUDD_ASSERT(level < (unsigned) cuddIZ(unique,T->index));
+    CUDD_ASSERT(level < (unsigned) cuddIZ(unique,Cudd_Regular(E)->index));
 #endif
 
-    if (subtable->keys > subtable->maxKeys) {
+    if UNLIKELY(subtable->keys > subtable->maxKeys) {
         if (unique->gcEnabled && ((unique->deadZ > unique->minDead) ||
 	(10 * subtable->dead > 9 * subtable->keys))) { 	/* too many dead */
 	    (void) cuddGarbageCollect(unique,1);
@@ -1304,8 +1318,8 @@ cuddUniqueInterZdd(
     looking = nodelist[pos];
 
     while (looking != NULL) {
-        if (cuddT(looking) == T && cuddE(looking) == E) {
-	    if (looking->ref == 0) {
+        if LIKELY(cuddT(looking) == T && cuddE(looking) == E) {
+	    if UNLIKELY(looking->ref == 0) {
 		cuddReclaimZdd(unique,looking);
 	    }
 	    return(looking);
@@ -1317,6 +1331,7 @@ cuddUniqueInterZdd(
     }
 
     /* countDead is 0 if deads should be counted and ~0 if they should not. */
+#ifdef CUDD_ORIG_INCLUSION
     if (unique->autoDynZ &&
     unique->keysZ - (unique->deadZ & unique->countDead) >= unique->nextDyn) {
 #ifdef DD_DEBUG
@@ -1335,7 +1350,7 @@ cuddUniqueInterZdd(
 #endif
 	return(NULL);
     }
-
+#endif /* CUDD_ORIG_INCLUSION  */
     unique->keysZ++;
     subtable->keys++;
 
@@ -1620,6 +1635,7 @@ cuddRehash(
   SeeAlso     [cuddRehash]
 
 ******************************************************************************/
+#ifdef CUDD_ORIG_INCLUSION
 void
 cuddShrinkSubtable(
   DdManager *unique,
@@ -1730,7 +1746,7 @@ cuddInsertSubtables(
     DdNode *one, *zero;
 
 #ifdef DD_DEBUG
-    assert(n > 0 && level < unique->size);
+    CUDD_ASSERT(n > 0 && level < unique->size);
 #endif
 
     oldsize = unique->size;
@@ -2010,7 +2026,6 @@ cuddInsertSubtables(
 
 } /* end of cuddInsertSubtables */
 
-
 /**Function********************************************************************
 
   Synopsis [Destroys the n most recently created subtables in a unique table.]
@@ -2089,7 +2104,7 @@ cuddDestroySubtables(
 	level = unique->perm[index];
 	nodelist = subtables[level].nodelist;
 #ifdef DD_DEBUG
-	assert(subtables[level].keys == 0);
+	CUDD_ASSERT(subtables[level].keys == 0);
 #endif
 	FREE(nodelist);
 	unique->memused -= sizeof(DdNodePtr) * subtables[level].slots;
@@ -2141,7 +2156,7 @@ cuddDestroySubtables(
     return(1);
 
 } /* end of cuddDestroySubtables */
-
+#endif
 
 /**Function********************************************************************
 
@@ -2365,7 +2380,7 @@ ddRehashZdd(
 	unique->gcFrac = DD_GC_FRAC_LO;
     }
 
-    assert(i != CUDD_MAXINDEX);
+    CUDD_ASSERT(i != CUDD_MAXINDEX);
     oldslots = unique->subtableZ[i].slots;
     oldshift = unique->subtableZ[i].shift;
     oldnodelist = unique->subtableZ[i].nodelist;
@@ -2999,6 +3014,7 @@ cuddDoRebalance(
   SeeAlso     []
 
 ******************************************************************************/
+#ifdef CUDD_ORIG_INCLUSION
 static void
 ddPatchTree(
   DdManager *dd,
@@ -3017,7 +3033,7 @@ ddPatchTree(
     return;
 
 } /* end of ddPatchTree */
-
+#endif
 
 #ifdef DD_DEBUG
 /**Function********************************************************************

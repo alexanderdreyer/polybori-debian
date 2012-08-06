@@ -4,14 +4,16 @@
 //  Created by Michael Brickenstein on 2007-07-02.
 //  Copyright (c) 2007 The PolyBoRi Team. See LICENSE file.
 
-#include "groebner_defs.h"
-#include <CCacheManagement.h>
-#include <CacheManager.h>
+#include <polybori/groebner/groebner_defs.h>
+#include <polybori/cache/CCacheManagement.h>
+#include <polybori/cache/CacheManager.h>
 #include <algorithm>
 #include <iostream>
-#include "interpolate.h"
-#include "randomset.h"
-#include "nf.h"
+#include <polybori/groebner/interpolate.h>
+#include <polybori/groebner/randomset.h>
+#include <polybori/groebner/nf.h>
+#include <polybori/groebner/add_up.h>
+
 BEGIN_NAMESPACE_PBORIGB
 
 std::vector<Polynomial> variety_lex_groebner_basis(const MonomialSet& points,const Monomial & variables){
@@ -34,7 +36,8 @@ MonomialSet nf_lex_points(const Polynomial& f,const MonomialSet& p){
     MonomialSet z=zeros(f,p);
     return interpolate_smallest_lex(z,p.diff(z));
 }
-MonomialSet gen_random_subset(const std::vector<Monomial>& vec,bool_gen_type&
+MonomialSet gen_random_subset(const BoolePolyRing& ring,
+			      const std::vector<Monomial>& vec,bool_gen_type&
 bit_gen){
     std::vector<Monomial> chosen;
     std::vector<Monomial>::const_iterator it=vec.begin();
@@ -45,21 +48,23 @@ bit_gen){
         }
         ++it;
     }
-    return add_up_monomials(chosen).diagram();
+    return add_up_monomials(chosen, ring.zero()).diagram();
 }
 MonomialSet random_interpolation(const MonomialSet& as_set, const std::vector<Monomial>& as_vector, bool_gen_type& bit_gen){
-  MonomialSet s1=gen_random_subset(as_vector,bit_gen);
+  MonomialSet s1=gen_random_subset(as_set.ring(), as_vector,bit_gen);
     return interpolate_smallest_lex(as_set.diff(s1),s1);
 }
 MonomialSet variety_lex_leading_terms(const MonomialSet& points, const Monomial& variables){
     base_generator_type generator(static_cast<unsigned int>(std::time(0)));
-    std::vector<Monomial> points_vec(points.size());
+
+    std::vector<Monomial> points_vec(points.size(), points.ring());
+
     std::copy(points.begin(),points.end(),points_vec.begin());
     bool_gen_type bit_gen(generator,distribution_type(0,1));
     MonomialSet vars_div=variables.divisors();
-    MonomialSet standards;
+    MonomialSet standards(points.ring());
     if (points!=vars_div){
-      standards = points.manager().zddOne();
+      standards = points.ring().one();
     }
     unsigned int len_standards=standards.size();
     unsigned int n_points=points.size();
@@ -79,13 +84,13 @@ MonomialSet variety_lex_leading_terms(const MonomialSet& points, const Monomial&
 }
 MonomialSet zeros(Polynomial p, MonomialSet candidates){
     MonomialSet s=p.diagram();
-    MonomialSet result;
+    MonomialSet result(s.ring());
     MonomialSet::navigator p_nav=s.navigation();
-    if (candidates.emptiness()) return candidates;
-    if (p.isOne()) return MonomialSet();
+    if (candidates.isZero()) return candidates;
+    if (p.isOne()) return MonomialSet(p.ring());
     if (p.isZero()) return candidates;
     if (Polynomial(candidates).isOne()){
-        if (p.hasConstantPart()) return MonomialSet();
+      if (p.hasConstantPart()) return MonomialSet(p.ring());
         else return candidates;
     }
     MonomialSet::navigator can_nav=candidates.navigation();
@@ -95,7 +100,7 @@ MonomialSet zeros(Polynomial p, MonomialSet candidates){
     }
     typedef PBORI::CacheManager<CCacheTypes::zeros>
       cache_mgr_type;
-    cache_mgr_type cache_mgr(candidates.manager());
+    cache_mgr_type cache_mgr(candidates.ring());
     MonomialSet::navigator cached=cache_mgr.find(p_nav, can_nav);
     if (cached.isValid() ){
       return cache_mgr.generate(cached);
@@ -112,21 +117,21 @@ MonomialSet zeros(Polynomial p, MonomialSet candidates){
     MonomialSet z11=zeros(p1,c1);
     //MonomialSet then_branch=z01.intersect(z11).unite(c1.diff(z01.unite(z11)));
     MonomialSet then_branch=c1.diff(z01.Xor(z11));
-    assert (*then_branch.navigation()>index);
-    assert (*z00.navigation()>index);
+    PBORI_ASSERT (*then_branch.navigation()>index);
+    PBORI_ASSERT (*z00.navigation()>index);
     result=MonomialSet(index,then_branch,z00);
     cache_mgr.insert(p_nav,can_nav,result.navigation());
     return result;
 }
 Polynomial interpolate(MonomialSet to_zero,MonomialSet to_one){
     //std::cout<<"to_one:"<<(Polynomial) to_one<<"to_zero:"<<(Polynomial) to_zero<<std::endl;
-    assert(to_zero.intersect(to_one).emptiness());
+    PBORI_ASSERT(to_zero.intersect(to_one).isZero());
 
     typedef PBORI::CacheManager<CCacheTypes::interpolate>
       cache_mgr_type;
-    cache_mgr_type cache_mgr(to_zero.manager());
-    if (to_zero.emptiness()) return cache_mgr.one();
-    if (to_one.emptiness()) return cache_mgr.zero();
+    cache_mgr_type cache_mgr(to_zero.ring());
+    if (to_zero.isZero()) return cache_mgr.one();
+    if (to_one.isZero()) return cache_mgr.zero();
 
     MonomialSet::navigator cached=cache_mgr.find(to_zero.navigation(), to_one.navigation());
     if (cached.isValid() ){
@@ -142,14 +147,14 @@ Polynomial interpolate(MonomialSet to_zero,MonomialSet to_one){
     return result;
 }
 /*Polynomial interpolate_smallest_lex(MonomialSet to_zero,MonomialSet to_one){
-    assert(to_zero.intersect(to_one).emptiness());
+    PBORI_ASSERT(to_zero.intersect(to_one).isZero());
 
     typedef PBORI::CacheManager<CCacheTypes::interpolate_smallest_lex>
       cache_mgr_type;
     cache_mgr_type cache_mgr;
 
-    if (to_zero.emptiness()) return cache_mgr.one();
-    if (to_one.emptiness()) return cache_mgr.zero();
+    if (to_zero.isZero()) return cache_mgr.one();
+    if (to_one.isZero()) return cache_mgr.zero();
 
     MonomialSet::navigator cached=cache_mgr.find(to_zero.navigation(), to_one.navigation());
     if (cached.isValid() ){
@@ -164,7 +169,7 @@ Polynomial interpolate(MonomialSet to_zero,MonomialSet to_one){
     MonomialSet to_zerou=to_zero1.unite(to_zero0);
     MonomialSet to_oneu=to_one1.unite(to_one0);
     MonomialSet result;
-    if (to_zerou.intersect(to_oneu).emptiness()){
+    if (to_zerou.intersect(to_oneu).isZero()){
         //std::cout<<"then branch"<<std::endl;
         result=interpolate_smallest_lex(to_zerou,to_oneu);
     } else {
@@ -180,13 +185,13 @@ Polynomial interpolate(MonomialSet to_zero,MonomialSet to_one){
 */
 
 Polynomial interpolate_smallest_lex(MonomialSet to_zero,MonomialSet to_one){
-    assert(to_zero.intersect(to_one).emptiness());
+    PBORI_ASSERT(to_zero.intersect(to_one).isZero());
 
     typedef PBORI::CacheManager<CCacheTypes::interpolate_smallest_lex>
       cache_mgr_type;
-    cache_mgr_type cache_mgr(to_zero.manager());
-    if (to_zero.emptiness()) return cache_mgr.one();
-    if (to_one.emptiness()) return cache_mgr.zero();
+    cache_mgr_type cache_mgr(to_zero.ring());
+    if (to_zero.isZero()) return cache_mgr.one();
+    if (to_one.isZero()) return cache_mgr.zero();
 
     MonomialSet::navigator cached=cache_mgr.find(to_zero.navigation(), to_one.navigation());
     if (cached.isValid() ){
@@ -201,8 +206,8 @@ Polynomial interpolate_smallest_lex(MonomialSet to_zero,MonomialSet to_one){
     MonomialSet to_zerou=to_zero1.unite(to_zero0);
     MonomialSet to_oneu=to_one1.unite(to_one0);
     
-    MonomialSet result;
-    if (to_zerou.intersect(to_oneu).emptiness()){
+    MonomialSet result(to_zero.ring());
+    if (to_zerou.intersect(to_oneu).isZero()){
         //std::cout<<"then branch"<<std::endl;
         result=interpolate_smallest_lex(to_zerou,to_oneu);
     } else {
@@ -236,7 +241,7 @@ MonomialSet include_divisors(const MonomialSet& m){
     if (nav.isConstant()) return m;
     typedef PBORI::CacheManager<CCacheTypes::include_divisors>
       cache_mgr_type;
-    cache_mgr_type cache_mgr(m.manager());
+    cache_mgr_type cache_mgr(m.ring());
     MonomialSet::navigator cached=cache_mgr.find(nav);
     if (cached.isValid() ){
       return cache_mgr.generate(cached);

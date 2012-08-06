@@ -52,6 +52,23 @@
 #define _CUDDINT
 
 
+/// For optimizing if-branches
+#ifdef __GNUC__
+#ifndef LIKELY
+#define LIKELY(expression) (__builtin_expect(!!(expression), 1))
+#endif
+#ifndef UNLIKELY
+#define UNLIKELY(expression) (__builtin_expect(!!(expression), 0))
+#endif
+#else
+#ifndef LIKELY
+#define LIKELY(expression) (expression)
+#endif
+#ifndef UNLIKELY
+#define UNLIKELY(expression) (expression)
+#endif
+#endif
+
 /*---------------------------------------------------------------------------*/
 /* Nested includes                                                           */
 /*---------------------------------------------------------------------------*/
@@ -71,8 +88,9 @@
 
 #include <math.h>
 #include "cudd.h"
+#ifdef CUDD_ORIG_INCLUSION
 #include "st.h"
-
+#endif
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -415,8 +433,10 @@ struct DdManager {	/* specialized DD symbol table */
     int realignZ;		/* realign BDD order after ZDD reordering */
     unsigned int nextDyn;	/* reorder if this size is reached */
     unsigned int countDead;	/* if 0, count deads to trigger reordering */
+#ifdef CUDD_ORIG_INCLUSION
     MtrNode *tree;		/* Variable group tree (BDD) */
     MtrNode *treeZ;		/* Variable group tree (ZDD) */
+#endif
     Cudd_AggregationType groupcheck; /* Used during group sifting */
     int recomb;			/* Used during group sifting */
     int symmviolation;		/* Used during group sifting */
@@ -1056,7 +1076,10 @@ extern void cuddCacheFlush (DdManager *table);
 extern int cuddComputeFloorLog2 (unsigned int value);
 extern int cuddHeapProfile (DdManager *dd);
 extern void cuddPrintNode (DdNode *f, FILE *fp);
-extern void cuddPrintVarGroups (DdManager * dd, MtrNode * root, int zdd, int silent);
+#ifdef CUDD_ORIG_INCLUSION
+extern void cuddPrintVarGroups (DdManager * dd, MtrNode * root, int zdd, int
+silent);
+#endif
 extern DdNode * cuddBddClippingAnd (DdManager *dd, DdNode *f, DdNode *g, int maxDepth, int direction);
 extern DdNode * cuddBddClippingAndAbstract (DdManager *dd, DdNode *f, DdNode *g, DdNode *cube, int maxDepth, int direction);
 extern void cuddGetBranches (DdNode *g, DdNode **g1, DdNode **g0);
@@ -1118,8 +1141,10 @@ extern void cuddShrinkDeathRow (DdManager *table);
 extern DdNode * cuddDynamicAllocNode (DdManager *table);
 extern int cuddSifting (DdManager *table, int lower, int upper);
 extern int cuddSwapping (DdManager *table, int lower, int upper, Cudd_ReorderingType heuristic);
+#ifdef CUDD_ORIG_INCLUSION
 extern int cuddNextHigh (DdManager *table, int x);
 extern int cuddNextLow (DdManager *table, int x);
+#endif
 extern int cuddSwapInPlace (DdManager *table, int x, int y);
 extern int cuddBddAlignToZdd (DdManager *table);
 extern DdNode * cuddBddMakePrime (DdManager *dd, DdNode *cube, DdNode *f);
@@ -1137,12 +1162,36 @@ extern DdNode * cuddAllocNode (DdManager *unique);
 extern DdManager * cuddInitTable (unsigned int numVars, unsigned int numVarsZ, unsigned int numSlots, unsigned int looseUpTo);
 extern void cuddFreeTable (DdManager *unique);
 extern int cuddGarbageCollect (DdManager *unique, int clearCache);
-extern DdNode * cuddZddGetNode (DdManager *zdd, int id, DdNode *T, DdNode *E);
-extern DdNode * cuddZddGetNodeIVO (DdManager *dd, int index, DdNode *g, DdNode *h);
+
+
 extern DdNode * cuddUniqueInter (DdManager *unique, int index, DdNode *T, DdNode *E);
 extern DdNode * cuddUniqueInterIVO (DdManager *unique, int index, DdNode *T, DdNode *E);
 extern DdNode * cuddUniqueInterZdd (DdManager *unique, int index, DdNode *T, DdNode *E);
 extern DdNode * cuddUniqueConst (DdManager *unique, CUDD_VALUE_TYPE value);
+
+
+#ifdef ORIG_CUDD
+
+extern DdNode * cuddZddGetNode (DdManager *zdd, int id, DdNode *T, DdNode *E);
+#else
+static inline DdNode *
+cuddZddGetNode(
+  DdManager * zdd,
+  int  id,
+  DdNode * T,
+  DdNode * E)
+{
+    DdNode	*node;
+
+    if (T == DD_ZERO(zdd))
+	return(E);
+    node = cuddUniqueInterZdd(zdd, id, T, E);
+    return(node);
+
+}
+#endif
+extern DdNode * cuddZddGetNodeIVO (DdManager *dd, int index, DdNode *g, DdNode *h);
+
 extern void cuddRehash (DdManager *unique, int i);
 extern void cuddShrinkSubtable (DdManager *unique, int i);
 extern int cuddInsertSubtables (DdManager *unique, int n, int level);
@@ -1175,8 +1224,10 @@ extern DdNode	* cuddBddIsop (DdManager *dd, DdNode *L, DdNode *U);
 extern DdNode	* cuddMakeBddFromZddCover (DdManager *dd, DdNode *node);
 extern int cuddZddLinearSifting (DdManager *table, int lower, int upper);
 extern int cuddZddAlignToBdd (DdManager *table);
+#ifdef CUDD_ORIG_INCLUSION
 extern int cuddZddNextHigh (DdManager *table, int x);
 extern int cuddZddNextLow (DdManager *table, int x);
+#endif
 extern int cuddZddUniqueCompare (int *ptr_x, int *ptr_y);
 extern int cuddZddSwapInPlace (DdManager *table, int x, int y);
 extern int cuddZddSwapping (DdManager *table, int lower, int upper, Cudd_ReorderingType heuristic);
@@ -1198,6 +1249,11 @@ extern int cuddZddP (DdManager *zdd, DdNode *f);
 
 #ifdef __cplusplus
 } /* end of extern "C" */
+#endif
+
+
+#ifndef CUDD_ORIG_INCLUSION
+#define Cudd_OutOfMem MMout_of_memory
 #endif
 
 #endif /* _CUDDINT */

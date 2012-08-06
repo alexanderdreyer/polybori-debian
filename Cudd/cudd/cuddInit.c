@@ -62,7 +62,12 @@
 /*---------------------------------------------------------------------------*/
 /* Constant declarations                                                     */
 /*---------------------------------------------------------------------------*/
+#ifndef CUDD_ORIG_INCLUSION
+void (*MMoutOfMemory)(long) = MMout_of_memory;
+/* MMout_of_memory -- out of memory for lazy people, flush and exit */
 
+
+#endif
 
 /*---------------------------------------------------------------------------*/
 /* Stucture declarations                                                     */
@@ -143,6 +148,7 @@ Cudd_Init(
     if (unique == NULL) return(NULL);
     maxCacheSize = (unsigned int) ((maxMemory / sizeof(DdCache)) /
 				   DD_MAX_CACHE_FRACTION);
+
     result = cuddInitCache(unique,cacheSize,maxCacheSize);
     if (result == 0) return(NULL);
 
@@ -152,6 +158,7 @@ Cudd_Init(
     MMoutOfMemory = saveHandler;
     if (unique->stash == NULL) {
 	(void) fprintf(unique->err,"Unable to set aside memory\n");
+        return (NULL);
     }
 
     /* Initialize constants. */

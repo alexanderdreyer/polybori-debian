@@ -2,8 +2,8 @@
 
 #include <boost/python.hpp>
 #include <iostream>
-#include "polybori.h"
-#include "pbori_defs.h"
+#include <polybori.h>
+#include <polybori/pbori_defs.h>
 #include "dd_wrapper.h"
 #include "Poly_wrapper.h"
 #include "navigator_wrap.h"
@@ -15,14 +15,14 @@
 #include "set_wrapper.h"
 #include "out_helper.h"
 #include "test_util.h"
+#include "fglm_wrapper.h"
 #ifdef HAVE_NTL
 #include "ntl_wrapper.h"
 #endif
 #ifdef HAVE_M4RI
 #define PACKED 1
 extern "C"{
-#include "../M4RI/packedmatrix.h"
-#include "../M4RI/grayflex.h"
+#include <m4ri/m4ri.h>
 }
 
 #endif
@@ -41,10 +41,11 @@ static BooleMonomial var_power(const BooleVariable& p, int n){
 void print_variable(const BooleVariable & p){
   ((const BoolePolynomial&) p).print(cout);
 }
-bool have_degree_order(){
-  return BooleEnv::ordering().isDegreeOrder();
-}
 
+
+// void print_ring_info() {
+//   BooleEnv::print(std::cout);
+// }
 
 BoolePolynomial
 ring_var(const BoolePolyRing& ring, BooleVariable::idx_type idx) {
@@ -69,14 +70,48 @@ translator_pboridivisionbyzero(const PBoRiGenericError<CTypes::division_by_zero>
 static BooleMonomial used_var(const BooleVariable& v){
     return v;
 }
-//EXPORT
-BOOST_PYTHON_MODULE(PyPolyBoRi){
+static BoolePolynomial::navigator nav(const BoolePolynomial& p){
+    return p.navigation();
+}
+
+
+BoolePolynomial coerce(const BoolePolyRing& ring, const BoolePolynomial& poly){
+  return ring.coerce(poly);
+}
+
+bool has_degree_order(const BoolePolyRing& ring) {
+  return ring.ordering().isDegreeOrder();
+}
+
+BoolePolyRing::ordercode_type
+get_order_code(const BoolePolyRing& ring) {
+  return ring.ordering().getOrderCode();
+} 
+
+void
+append_block(const BoolePolyRing& ring,
+             BoolePolyRing::idx_type next_block_start) {
+  return ring.ordering().appendBlock(next_block_start);
+} 
+
+BoolePolyRing::order_type::block_iterator
+ring_block_begin(const BoolePolyRing& ring) {
+  return ring.ordering().blockBegin();
+}
+
+BoolePolyRing::order_type::block_iterator
+ring_block_end(const BoolePolyRing& ring) {
+  return ring.ordering().blockEnd();
+}
+
+void export_main() {
   
-  BoolePolyRing r;
+  BoolePolyRing r(10);
+  BooleMonomial monom(r);
 
   #ifdef HAVE_M4RI
   m4ri_build_all_codes();
-  
+  //m4ri_init();
   //setupPackingMasks();
   #endif
    //workaround for having a current_ring
@@ -84,9 +119,9 @@ BOOST_PYTHON_MODULE(PyPolyBoRi){
   implicitly_convertible<BooleVariable,BoolePolynomial>();
   implicitly_convertible<BooleMonomial,BoolePolynomial>();
   implicitly_convertible<int,BooleConstant>();
+  implicitly_convertible<BooleConstant,int>();
   implicitly_convertible<BoolePolynomial,BooleSet>();
   implicitly_convertible<BooleSet,BoolePolynomial>();
-  def("change_ordering",&BooleEnv::changeOrdering);
 
   export_poly();
   export_nav();
@@ -110,16 +145,25 @@ BOOST_PYTHON_MODULE(PyPolyBoRi){
     dp_asc
   };
 };*/
-  def("get_order_code",&BooleEnv::getOrderCode);  
-  def("print_ring_info", &BooleEnv::printInfo);
-  
-  boost::python::class_<BooleRing>("BooleRing", "Boolean ring")
-    .def(boost::python::init <BooleRing::size_type>());
+  //  def("print_ring_info", print_ring_info);
 
-  boost::python::class_<BoolePolyRing,boost::python::bases<BooleRing> >("Ring", "Boolean polynomial ring")
-    //.def(boost::python::init <>())
-    .def("set",&BooleEnv::set, "Activate current Ring")
+
+  implicitly_convertible<CCheckedIdx::idx_type, CCheckedIdx>();
+
+  boost::python::class_<BoolePolyRing>("Ring", "Boolean polynomial ring",
+                                       boost::python::init <const BoolePolyRing&>()) 
+    .def("n_variables", &BoolePolyRing::nVariables, "Number of ring variables")
+    .def("__hash__", &BoolePolyRing::hash)
+    .def("id", &BoolePolyRing::id)
+    .def("var", ring_var, "i-th ring Variable")
+    .def("variable", &BoolePolyRing::variable, "i-th ring Variable")
+    .def("one", ring_one, "Polynomial one")
+    .def("zero", ring_zero, "Polynomial zero")
     .def(boost::python::init <BoolePolyRing::size_type>())
+    .def("clone", &BoolePolyRing::clone, "copies also variable name vector in a \
+    new one, so somewhat deeper copy function")
+    .def("coerce", coerce, "Map polynomial in this ring, if possible.")
+    .def("__call__", coerce, "Map polynomial in this ring, if possible.")
     .def(boost::python::init <BoolePolyRing::size_type, int>(
          "Construct a Boolean polynomial ring with the following parameters:\n\
             n -- number of variables (integer)\n\
@@ -130,34 +174,44 @@ BOOST_PYTHON_MODULE(PyPolyBoRi){
 with inverted variable order\n\
                 block_dp_asc: Block ordering with blocks consisting of dp_asc\n\
                 block_dlex: Block ordering with blocks consisting of dlex\n") )
-//#ifdef WRAP_ALSO_CUUD
-    .def("var", ring_var, "i-th ring Variable")
-    .def("one", ring_one, "Polynomial one")
-    .def("zero", ring_zero, "Polynomial zero")
-//#endif
-    .def("nVars", &BoolePolyRing::nVariables, "Number of ring variables");
+
+    .def("has_degree_order", has_degree_order,
+        "Determines, whether ring ordering is a degree ordering")
+    .def("set_variable_name",&BoolePolyRing::setVariableName)
+    .def("change_ordering",&BoolePolyRing::changeOrdering)
+    .def("get_order_code", get_order_code)
+    .def("append_block", append_block,
+      "Append integer, which marks the index of the start of the next block (for block orderings)")
+    .def("blocks", range(ring_block_begin, ring_block_end));
   
-  def("append_ring_block", &BooleEnv::appendBlock, 
-      "Append integer, which marks start of next block (for block orderings)");
-  def("have_degree_order", have_degree_order, 
-      "Determines, whether ring ordering is a degree ordering");
 
   boost::python::class_<BooleConstant>("BooleConstant", 
                                        "Boolean constant value")
     .def(init<const BooleConstant &>())
     .def(init<int>("Convert integer to Boolean value"))
     .def(init<bool>("Convert bool to Boolean value"))
+    .def(self+self)
+    .def(self-self)
+    .def(self*self)
     .def("__str__", streamable_as_str<BooleConstant>)
-    .def("__repr__", streamable_as_str<BooleConstant>);
-  ;
-  boost::python::class_<BooleVariable>("Variable", "Boolean Variable")
+    .def("__repr__", streamable_as_str<BooleConstant>)
+    .def("variables", range(&BooleConstant::variableBegin, &BooleConstant::variableEnd))
+    .def("deg", &BooleConstant::deg)
+    .def("is_one", &BooleConstant::isOne)
+    .def("is_zero", &BooleConstant::isZero)
+    .def("is_constant", &BooleConstant::isConstant)
+    .def("has_constant_part", &BooleConstant::hasConstantPart);
+
+  boost::python::class_<BooleVariable>("Variable", "Boolean Variable", init<const BoolePolyRing&>())
   .def(init<const BooleVariable &>())
-  .def(init<BooleVariable::idx_type>("Get Variable of given index"))
+  .def(init<const BoolePolyRing&>("Get first Variable in a given ring"))
+  .def(init<BooleVariable::idx_type, 
+       const BoolePolyRing&>("Get Variable of given index in a given ring"))
   .def(self*self)
   .def(self/self)
-  .def(self*BooleMonomial())
-  .def(self/BooleMonomial())
-  .def(BooleMonomial()*self)
+  .def(self*monom)
+  .def(self/monom)
+  .def(monom*self)
   .def(self*int())
   .def(self/int())
   .def(int()*self)
@@ -169,41 +223,35 @@ with inverted variable order\n\
   .def(self<self)
   .def(self<=self)
   .def(self==self)
-  .def("varsAsMonomial",&used_var, 
+  .def("lead", lead_wrap)
+  .def("lex_lead", lex_lead_wrap)
+  .def("lex_lead_deg", lex_lead_deg_wrap)
+  .def("lead_deg", lead_deg_wrap)
+  .def("has_constant_part", has_constant_part_wrap)
+  .def("navigation", nav)
+  .def("vars_as_monomial",&used_var, 
        "Variables occurring in Polynomial")
   .def("__str__", streamable_as_str<BooleVariable>)
   .def("__repr__", streamable_as_str<BooleVariable>)
-  .def("__hash__", &BooleVariable::index)
+  .def("__hash__", &BooleVariable::hash)
+  .def("stable_hash", &BooleMonomial::stableHash, "Reproducible hash code")
   .def("__pow__", var_power)
   .def("index", &BooleVariable::index, "Variable position in the ring")
   .def("set",&BooleVariable::set, "Convert to BooleSet")
-  .def("ring", &BooleVariable::ring, "Get corresponding ring")
-  .def("toStdOut", print_variable);
+  .def("ring", &BooleVariable::ring,
+       return_internal_reference<>(),
+       "Get corresponding ring");
+
+  boost::python::class_<WeakRingPtr>("WeakRingRef",
+				     "Weak reference to Boolean polynomial ring",
+				     boost::python::init <const BoolePolyRing&>()) 
+    .def("deref", &WeakRingPtr::operator*, "Get strong reference")
+    .def("is_valid", &WeakRingPtr::operator bool,
+	 "Check whether pointer is not dead");
+
+
   boost::python::register_exception_translator<PBoRiError>(translator_pborierror);
   typedef PBoRiGenericError<CTypes::division_by_zero> pbori_div_by_zero;
   boost::python::register_exception_translator<pbori_div_by_zero>(translator_pboridivisionbyzero);
 
-  export_strategy();
-  export_monomial();
-  export_bset();
-  export_variable_block();
-  export_misc();
-   }
-#ifdef PB_STATIC_PROFILING_VERSION
-int main(int argc,char* argv[]){
-  Py_Initialize();
-  initPyPolyBoRi();
-  PyRun_SimpleString("from sys import path");
-  PyRun_SimpleString("path.append('.')");
-  PyRun_SimpleString("path.append('../pyroot')");
-
-  PyRun_SimpleString("import toprofile");
-  Py_Finalize();
-  return 0;
 }
-#endif
-/*
-
-
-BDD PortToBdd() const;
-*/

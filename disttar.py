@@ -40,8 +40,14 @@ def DistTarEmitter(target,source,env):
             for patt in excludepattern:
                 ignoreglobs += glob(os.path.join(root, patt))
                   
-            # don't make directory dependences as that triggers full build
+            # Was: don't make directory dependences as that triggers full build
             # of that directory
+            # Since this is a recurring mistake:
+            # Indeed: adding directories to be dependencies will trigger build!
+            # But we want to stay in clean for distributing
+            #
+            # But - to fix permission - we will add the directory on the fly 
+            # (while taring)
             if root in source:
                #print "Removing directory %s" % root
                source.remove(root)
@@ -94,14 +100,54 @@ def DistTar(target, source, env):
 
    # open our tar file for writing
    sys.stderr.write("DistTar: Writing "+str(target[0]))
+   import time
+   mtime= time.time()
+
    tar = tarfile.open(str(target[0]), "w:%s" % (tar_format,))
 
+   default_info = tarfile.TarInfo()
+
    # write sources to our tar file
+   files = []
    for item in source:
+      itemdir=item.dir
+
+      visited = [item]
+      if itemdir not in files:
+         while str(itemdir) != "."  and not itemdir in files:
+            visited.insert(0, itemdir)
+            itemdir = itemdir.dir
+      files += visited
+
+   for item in files:
       item = str(item)
       sys.stderr.write(".")
       #print "Adding to TAR file: %s/%s" % (dir_name,item)
-      tar.add(item,'%s/%s' % (dir_name,item))
+      info = tar.gettarinfo(item,'%s/%s' % (dir_name,item))
+
+      if info is None:
+         sys.stderr.write("disttar: Unsupported type %r" % item)
+         return
+
+      info.mtime = mtime
+      info.gname = default_info.gname
+      info.uname = default_info.uname
+      info.gid = default_info.gid
+      info.uid = default_info.uid
+
+      if info.isreg():
+         if os.access(item, os.X_OK):
+            info.mode = 0100755
+         else:
+            info.mode = 0100644
+         file = open(item, "rb")
+         tar.addfile(info, file)
+         file.close()
+
+      else:
+         if info.isdir():
+            info.mode = 040755
+         tar.addfile(info)         
 
    # all done
    sys.stderr.write("\n") #print "Closing TAR file"

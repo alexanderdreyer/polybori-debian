@@ -4,8 +4,8 @@
 //  Created by  on 2008-04-16.
 //  Copyright (c) 2008 The PolyBoRi Team. See LICENSE file.
 //  PolyBoRi Project
-#include "groebner_defs.h"
-#include "polynomial_properties.h"
+#include <polybori/groebner/groebner_defs.h>
+#include <polybori/groebner/polynomial_properties.h>
 #include <iostream>
 using namespace std;
 BEGIN_NAMESPACE_PBORIGB
@@ -39,24 +39,24 @@ Polynomial do_is_rewriteable(const Polynomial& p, const MonomialSet& leading_ter
             changed=true;
         }
     }
-    assert(l_i==*l_nav);
-    assert(p_i==*p_nav);
-    assert(p_i<=l_i);
+    PBORI_ASSERT(l_i==*l_nav);
+    PBORI_ASSERT(p_i==*p_nav);
+    PBORI_ASSERT(p_i<=l_i);
 
     
     
     typedef PBORI::CacheManager<CCacheTypes::mod_mon_set>
       cache_mgr_type_mod_mon_set;
-    cache_mgr_type_mod_mon_set cache_mgr_mod_mon_set(p.diagram().manager());
+    cache_mgr_type_mod_mon_set cache_mgr_mod_mon_set(p.ring());
     typedef PBORI::CacheManager<CCacheTypes::is_rewriteable>
       cache_mgr_type;
-    cache_mgr_type cache_mgr(p.diagram().manager());
-    assert(!(p.isZero()));
-    assert(!(p_nav.isEmpty()));
+    cache_mgr_type cache_mgr(p.ring());
+    PBORI_ASSERT(!(p.isZero()));
+    PBORI_ASSERT(!(p_nav.isEmpty()));
     if (cache_mgr.generate(l_nav).ownsOne()){
         return cache_mgr.one();
     }
-    assert(!(cache_mgr.generate(l_nav).ownsOne()));
+    PBORI_ASSERT(!(cache_mgr.generate(l_nav).ownsOne()));
     
     if (p_nav.isTerminated()){
         return cache_mgr.zero();
@@ -64,7 +64,7 @@ Polynomial do_is_rewriteable(const Polynomial& p, const MonomialSet& leading_ter
     if (l_nav.isEmpty()){
         return cache_mgr.zero();
     }
-    assert(!(p_nav.isConstant()));
+    PBORI_ASSERT(!(p_nav.isConstant()));
     
     Polynomial::navigator cached= cache_mgr.find(p_nav,l_nav);
     if (cached.isValid()) {
@@ -76,10 +76,10 @@ Polynomial do_is_rewriteable(const Polynomial& p, const MonomialSet& leading_ter
         return (cached_mod_mon_set==p_nav)?cache_mgr.zero():cache_mgr.one();
     }
     
-    assert (!(l_nav.isConstant()));
+    PBORI_ASSERT (!(l_nav.isConstant()));
     Polynomial p0=cache_mgr.generate(p_nav.elseBranch());
     Polynomial p1=cache_mgr.generate(p_nav.thenBranch());
-    Polynomial res;
+    Polynomial res(p.ring());
     if (l_i>p_i){
         MonomialSet l_curr=cache_mgr.generate(l_nav);
         if (((do_is_rewriteable(p0,l_curr)).isOne())||(do_is_rewriteable(p1,l_curr).isOne())){
@@ -88,7 +88,7 @@ Polynomial do_is_rewriteable(const Polynomial& p, const MonomialSet& leading_ter
             res= cache_mgr.zero();
         }
     } else{
-        assert(l_i==p_i);
+        PBORI_ASSERT(l_i==p_i);
         MonomialSet l0=cache_mgr.generate(l_nav.elseBranch());
         MonomialSet l1=cache_mgr.generate(l_nav.thenBranch());
         if ((do_is_rewriteable(p0,l0).isOne())||(do_is_rewriteable(p1,l1).isOne())||(do_is_rewriteable(p1,l0).isOne())){

@@ -10,7 +10,7 @@
 #include <boost/python.hpp>
 #include <iostream>
 #include "polybori.h"
-#include "pbori_defs.h"
+#include "polybori/pbori_defs.h"
 using namespace boost::python;
 using namespace std;
 USING_NAMESPACE_PBORI
@@ -34,19 +34,15 @@ void export_nav(){
   .def(init<>())
   .def(init<const CCuddNavigator &>("Iterator-like object, which allows to \
 navigate through ZDD-based data structures,"))
-  .def("thenBranch", then_branch, "Following then-edge of thr root node")
-  .def("elseBranch", else_branch, "Following else-edge of thr root node")
+  .def("then_branch", then_branch, "Following then-edge of thr root node")
+  .def("else_branch", else_branch, "Following else-edge of thr root node")
   .def(self==self)
   .def(self!=self)
-  .def("value",value)
+  .def("value",value, "Index of the current node")
   .def("constant", &CCuddNavigator::isConstant, "Terminal node test")
-    .def("terminalOne", &CCuddNavigator::isTerminated, "Check for terminal 1")
+    .def("terminal_one", &CCuddNavigator::isTerminated, "Check for terminal 1")
   .def("__hash__", &CCuddNavigator::hash, "Fast hash code, based on the \
 pointer to the underlying ZDD node. \nIt may vary from runtime to runtime.")
   .def("valid", &CCuddNavigator::isValid, 
        "If navigator is constant, this checks for terminal one");
-  def("one", &BooleEnv::one, "Constant one of the active ring");
-  def("zero", &BooleEnv::zero, "Constant zero of the active ring");
-  def("number_of_variables", &BooleEnv::nVariables, 
-      "Number of variables in the active ring");
 }

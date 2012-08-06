@@ -10,15 +10,16 @@ import sys
 from optparse import OptionParser
 #if __name__ == "__main__":
 #    import pathadjuster
-from polybori.PyPolyBoRi import *
+from polybori.PyPolyBoRi import Polynomial, Monomial, BooleConstant, BooleSet
+from polybori.PyPolyBoRi import recursively_insert
 from polybori.gbrefs import my_import, load_data, clean_data,load_file
 from polybori.blocks import IfThen
 from copy import copy
-from polybori.ll import llredsb_Cudd_style, ll_encode
+from polybori.ll import ll_encode, ll_red_nf_noredsb, ll_red_nf_redsb
 
 def find_one(p,res=None):
     def zero_nav(n):
-        return n.constant() and (not n.terminalOne())
+        return n.constant() and (not n.terminal_one())
     try:
         p=p.navigation()
     except AttributeError:
@@ -27,12 +28,12 @@ def find_one(p,res=None):
         res=dict()
     if zero_nav(p):
         raise ValueError
-    if p.terminalOne():
+    if p.terminal_one():
         return res
-    else_branch=p.elseBranch()
+    else_branch=p.else_branch()
     if zero_nav(else_branch):
         res[Monomial(Variable(p.value()))]=1
-        find_one(p.thenBranch(),res)
+        find_one(p.then_branch(),res)
     else:
         res[Monomial(Variable(p.value()))]=0
         find_one(else_branch,res)
@@ -48,29 +49,31 @@ parser.add_option("--method",
                   help="select method")
 
 def my_red_nf(p,strat):
-  if p.isZero():
-    return Polynomial(0)
-  hr=nf3(strat,p,p.lead())
-  if hr.isZero():
-    return Polynomial(0)
+  if p.is_zero():
+    return p
+  hr=nf3(strat.reduction_strategy,p,p.lead())
+  if hr.is_zero():
+    return hr
   return red_tail(strat,hr)
 def gen_strat(polys):
   polys=[Polynomial(p) for p in polys]
-  polys=[p for p in polys if not p.isZero()]
+  polys=[p for p in polys if not p.is_zero()]
   assert len(set([p.lead() for p in polys]))==len(polys)
-  strat=GroebnerStrategy()
+  assert polys
+  strat=GroebnerStrategy(polys[0].ring())
   for p in polys:
     print "Adding"
-    strat.addGenerator(p)
+    strat.add_generator(p)
   print "finished"
   return strat
 def logicaland(l):
-  res=Polynomial(0)
+  res=BooleConstant(0)
   for p in l:
     res=1+(res+1)*(p+1)
   return res
+
 def logicalor(l):
-  res=Polynomial(1)
+  res=BooleConstant(1)
   for p in l:
     res=res*p
   return res
@@ -83,12 +86,12 @@ def proof(ifthen,strat):
   it=ifthen.thenpart
   print "proofing:", ifthen
   c=logicalor([1+logicaland(ip),logicaland(it)])
-  if c.isZero():
+  if c.is_zero():
     print "TRUE (trivial)"
     return
   else:
-    c=nf3(strat,c,c.lead())
-    if c.isZero():
+    c=nf3(strat.reduction_strategy,c,c.lead())
+    if c.is_zero():
       print "TRUE"
       return
     else:
@@ -104,10 +107,10 @@ def proofll(ifthen,reductors,redsb=True,prot=True):
 
   for p in ip_pre:
     p=Polynomial(p)
-    if p.isZero(): continue
+    if p.is_zero(): continue
     li=list(p.lead().variables())
     if len(li)==1 and (not (li[0] in list(Polynomial(reductors).lead().variables()))):
-      assert not Polynomial(reductors).isZero()
+      assert not Polynomial(reductors).is_zero()
       lead_index=li[0]
       if redsb:
           p=ll_red_nf_redsb(p,reductors)
@@ -115,7 +118,7 @@ def proofll(ifthen,reductors,redsb=True,prot=True):
 
       
       p_nav=p.navigation()
-      reductors=recursively_insert(p_nav.elseBranch(),p_nav.value(),reductors)
+      reductors=recursively_insert(p_nav.else_branch(),p_nav.value(),reductors)
     else:
       ip.append(p)
   it=ifthen.thenpart
@@ -125,19 +128,19 @@ def proofll(ifthen,reductors,redsb=True,prot=True):
   for c in it:
     if prot:
         print "proofing part:",c
-    c=logicalor([1+ip,c])
+    c=logicalor([BooleConstant(1)+ip,c])
 
-    if c.isZero():
+    if c.is_zero():
       if prot:
          print "TRUE (trivial)"
       return True
     else:
       c_orig=c
       if redsb:
-          c=ll_red_nf(c,reductors)
+          c=ll_red_nf_redsb(c,reductors)
       else:
           c=ll_red_nf_noredsb(c,reductors)
-      if c.isZero():
+      if c.is_zero():
         if prot:
             print "TRUE"
         return True
@@ -179,7 +182,7 @@ def main(argv=None):
            except NameError:
                 pass
        else:
-           reductors=BooleSet(llredsb_Cudd_style(mydata.ideal).set())
+           reductors=ll_encode(mydata.ideal, reduce=True)
            for c in claims:
              proofll(to_if_then(c),reductors)
            del reductors

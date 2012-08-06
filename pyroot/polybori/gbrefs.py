@@ -48,7 +48,7 @@ def number_of_declared_vars(data):
     try:
         return data.number_of_declared_vars
     except:
-        return data.r.nVars()
+        return data.r.ngens()
 def load_ref_gz_uu(s,o,b):
     s=sub("data/","",s)
     s=sub(r"data\.","",s)
@@ -101,7 +101,7 @@ def my_import(name, globals=None, locals=None):
     return mod
 def dyn_generate(content, name):
     module=imp.new_module(name)
-    import_header="""from polybori.PyPolyBoRi import Variable, Monomial, Polynomial, Ring, OrderCode
+    import_header="""from polybori.PyPolyBoRi import Variable,Monomial, Polynomial, Ring, OrderCode
 from itertools import chain
 from polybori.blocks import AlternatingBlock,Block,AdderBlock,if_then,HigherOrderBlock,declare_ring as orig_declare_ring,declare_block_scheme,MacroBlock\n
 def declare_ring(blocks, context=None):
@@ -142,10 +142,11 @@ def load_data(file_name, base_dir="./"):
     #return my_import(in_file)
     return dyn_generate(in_file, "pb_data")
 
-def load_file(file_name, base_dir="./"):
+def load_file(file_name):
 
     in_file=file_name
+    
 
-    in_file=open(base_dir + in_file).read()
+    in_file=open( in_file).read()
 
     return dyn_generate(in_file, "pb_data")

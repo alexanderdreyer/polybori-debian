@@ -229,7 +229,7 @@ Cudd_PrintMinterm(
 
 } /* end of Cudd_PrintMinterm */
 
-
+#ifdef CUDD_ORIGINAL_INCLUSION
 /**Function********************************************************************
 
   Synopsis    [Prints a sum of prime implicants of a BDD.]
@@ -346,7 +346,7 @@ Cudd_bddPrintCover(
     return(1);
 
 } /* end of Cudd_bddPrintCover */
-
+#endif
 
 /**Function********************************************************************
 
@@ -718,7 +718,7 @@ Cudd_CountPathsToNonZero(
 
 } /* end of Cudd_CountPathsToNonZero */
 
-
+#ifdef CUDD_ORIGINAL_INCLUSION
 /**Function********************************************************************
 
   Synopsis    [Finds the variables on which a DD depends.]
@@ -790,7 +790,7 @@ Cudd_Support(
     return(res);
 
 } /* end of Cudd_Support */
-
+#endif
 
 /**Function********************************************************************
 
@@ -885,7 +885,7 @@ Cudd_SupportSize(
 
 } /* end of Cudd_SupportSize */
 
-
+#ifdef CUDD_ORIGINAL_INCLUSION
 /**Function********************************************************************
 
   Synopsis    [Finds the variables on which a set of DDs depends.]
@@ -957,7 +957,7 @@ Cudd_VectorSupport(
     return(res);
 
 } /* end of Cudd_VectorSupport */
-
+#endif
 
 /**Function********************************************************************
 
@@ -1061,7 +1061,7 @@ Cudd_VectorSupportSize(
 
 } /* end of Cudd_VectorSupportSize */
 
-
+#ifdef CUDD_ORIGINAL_INCLUSION
 /**Function********************************************************************
 
   Synopsis    [Classifies the variables in the support of two DDs.]
@@ -1171,7 +1171,7 @@ Cudd_ClassifySupport(
     return(1);
 
 } /* end of Cudd_ClassifySupport */
-
+#endif
 
 /**Function********************************************************************
 
@@ -1259,7 +1259,7 @@ Cudd_bddPickOneCube(
 
 } /* end of Cudd_bddPickOneCube */
 
-
+#ifdef CUDD_ORIGINAL_INCLUSION
 /**Function********************************************************************
 
   Synopsis    [Picks one on-set minterm randomly from the given DD.]
@@ -1360,8 +1360,8 @@ Cudd_bddPickOneMinterm(
     return(old);
 
 }  /* end of Cudd_bddPickOneMinterm */
-
-
+#endif
+#ifdef CUDD_ORIGINAL_INCLUSION
 /**Function********************************************************************
 
   Synopsis    [Picks k on-set minterms evenly distributed from given DD.]
@@ -1569,8 +1569,8 @@ Cudd_bddPickArbitraryMinterms(
     return(old);
 
 }  /* end of Cudd_bddPickArbitraryMinterms */
-
-
+#endif
+#ifdef CUDD_ORIGINAL_INCLUSION
 /**Function********************************************************************
 
   Synopsis    [Extracts a subset from a BDD.]
@@ -1755,7 +1755,7 @@ Cudd_SubsetWithMaskVars(
     return(subset);
 
 } /* end of Cudd_SubsetWithMaskVars */
-
+#endif
 
 /**Function********************************************************************
 
@@ -1983,7 +1983,7 @@ done:
 
 } /* end of Cudd_NextCube */
 
-
+#ifdef CUDD_ORIGINAL_INCLUSION
 /**Function********************************************************************
 
   Synopsis    [Finds the first prime of a Boolean function.]
@@ -2098,8 +2098,8 @@ Cudd_FirstPrime(
     return(gen);
 
 } /* end of Cudd_FirstPrime */
-
-
+#endif
+#ifdef CUDD_ORIGINAL_INCLUSION
 /**Function********************************************************************
 
   Synopsis    [Generates the next prime of a Boolean function.]
@@ -2164,8 +2164,8 @@ Cudd_NextPrime(
     return(1);
 
 } /* end of Cudd_NextPrime */
-
-
+#endif
+#ifdef CUDD_ORIGINAL_INCLUSION
 /**Function********************************************************************
 
   Synopsis    [Computes the cube of an array of BDD variables.]
@@ -2214,8 +2214,8 @@ Cudd_bddComputeCube(
     return(cube);
 
 }  /* end of Cudd_bddComputeCube */
-
-
+#endif
+#ifdef CUDD_ORIGINAL_INCLUSION
 /**Function********************************************************************
 
   Synopsis    [Computes the cube of an array of ADD variables.]
@@ -2265,8 +2265,8 @@ Cudd_addComputeCube(
     return(cube);
 
 } /* end of Cudd_addComputeCube */
-
-
+#endif
+#ifdef CUDD_ORIGINAL_INCLUSION
 /**Function********************************************************************
 
   Synopsis    [Builds the BDD of a cube from a positional array.]
@@ -2311,8 +2311,8 @@ Cudd_CubeArrayToBdd(
     return(cube);
 
 } /* end of Cudd_CubeArrayToBdd */
-
-
+#endif
+#ifdef CUDD_ORIGINAL_INCLUSION
 /**Function********************************************************************
 
   Synopsis    [Builds a positional array from the BDD of a cube.]
@@ -2366,7 +2366,7 @@ Cudd_BddToCubeArray(
     }
 
 } /* end of Cudd_BddToCubeArray */
-
+#endif
 
 /**Function********************************************************************
 
@@ -2525,7 +2525,7 @@ Cudd_IsGenEmpty(
 
 } /* end of Cudd_IsGenEmpty */
 
-
+#ifdef CUDD_ORIGINAL_INCLUSION
 /**Function********************************************************************
 
   Synopsis    [Builds a cube of BDD variables from an array of indices.]
@@ -2564,7 +2564,7 @@ Cudd_IndicesToCube(
     return(cube);
 
 } /* end of Cudd_IndicesToCube */
-
+#endif
 
 /**Function********************************************************************
 

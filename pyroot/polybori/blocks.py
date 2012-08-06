@@ -2,7 +2,8 @@ import sys
 if __name__=='__main__':
     import pathadjuster
 
-from polybori.PyPolyBoRi import *
+from polybori.PyPolyBoRi import Ring, VariableBlock, Polynomial
+from polybori.PyPolyBoRi import VariableFactory, MonomialFactory
 from itertools import chain,islice
 #class BlockEndException(object):
   #pass
@@ -10,15 +11,6 @@ from itertools import chain,islice
   # self.arg = arg
   # pass
   
-
-def set_names_decorator(method):
-  def method_new(self,start,context):
-    for (i,name) in enumerate(self):
-      set_variable_name(i+start,name)
-      method(self,start,context)
-  method_new.__name__=method.__name__
-  return method_new
-
 
 class Block(object):
   """The block class represents a block of variables <var_name>(start_index,...,start_index+size-1), it is the preferred block type for simple one-dimensional variable sets"""  
@@ -43,8 +35,13 @@ class Block(object):
   def register(self, start, context):
       #def var_func(i):
       #  return Variable(self.index2pos[i]+start)
-      
-      var_func=VariableBlock(self.size,self.start_index,start,self.reverse)
+      ring_context = context
+      while isinstance(ring_context, PrefixedDictProxy):
+          ring_context = ring_context.wrapped
+      ring = ring_context['r']
+
+      var_func=VariableBlock(self.size,self.start_index,start,self.reverse,
+                             ring)
       var_func.__name__=self.var_name
       context[self.var_name]=var_func
 
@@ -74,9 +71,22 @@ class AlternatingBlock(object):
   
   def register(self,start,context):
     def gen_var_func(var_pos):
-      def var_func(i):
-        return Variable(self.index2pos[i]*len(self.var_names)+var_pos+start)
-      return var_func
+
+      class var_factory(object):
+          def __init__(self, ring, index2pos, size):
+              self.ring = ring
+              self.index2pos = index2pos
+              self.size = size
+          def __call__(self, idx):
+              return self.ring.variable(self.index2pos[idx]*self.size +
+                                        var_pos+start)
+      ring_context = context
+      while isinstance(ring_context, PrefixedDictProxy):
+          ring_context = ring_context.wrapped
+      ring = ring_context['r']
+
+      return var_factory(ring, self.index2pos, len(self.var_names))
+
     for (var_pos,n) in enumerate(self.var_names):
       var_func=gen_var_func(var_pos)
       var_func.__name__=n
@@ -105,7 +115,7 @@ class AdderBlock(AlternatingBlock):
     self.c=shift(context[self.carries],self.start_index)
     a=shift(a,self.start_index)
     b=shift(b,self.start_index)
-    carries=[Polynomial(0)]
+    carries=[Polynomial(a(0).ring().zero())]
     for i in xrange(self.adder_bits):
       #print i, ":"
       c=1+(1+a(i)*b(i))*(1+carries[-1]*a(i))*(1+carries[-1]*b(i))
@@ -127,7 +137,13 @@ class AdderBlock(AlternatingBlock):
 
   
 class HigherOrderBlock(object):
-  """HigherOrderBlocks are multidimensional blocks of variables, for each dimension a seperate start_index and size can be specified"""
+  """HigherOrderBlocks are multidimensional blocks of variables, for each dimension a seperate start_index and size can be specified
+
+	var_name : variables will be called <var_name>(multiindex), where multiindex is a tuple of the size <size_tuple>
+	size_tuple : specifies the sizes of the ranges of each component of the multi-indices
+	start_index_tuple : the multi-indices will be of the form start_index_tuple + a, where a is a multi-index with non-negative components
+	
+	"""
   def __init__(self, var_name,size_tuple,start_index_tuple=None,reverse=False):
     if start_index_tuple is None:
       start_index_tuple=len(size_tuple)*(0,)
@@ -300,7 +316,8 @@ class IfThen(object):
     return "If(AND("+", ".join([str(p)+" == 0" for p in self.ifpart])+")), THEN " +", ".join([str(p)+" == 0" for p in self.thenpart])
 def if_then(i,t,supposed_to_be_valid=True):
   return IfThen(i,t,supposed_to_be_valid)
-def declare_ring(blocks,context):
+
+def declare_ring(blocks,context=None):
   """Declare Ring is the preferred function to create a ring and declare a variable scheme, 
   the number of variables is automatically determined,
   usually you pass globals() as context argument to store the ring and the variable mapping.
@@ -309,33 +326,49 @@ def declare_ring(blocks,context):
   gives  a ring with x(0..9),y(0..4) and registers the ring as r, 
   and the variable blocks x and y in the context dictionary globals(), which consists of the global variables of the python module
   """
+  if context is None:
+      context = sys.modules['__main__'].__dict__
+
+  def canonicalize(blocks):
+      for elt in blocks:
+          if isinstance(elt, str):
+              yield elt
+          else:
+              for subelt in elt:
+                  yield subelt
+
+  blocks=list(blocks)
   n=0
+
   for b in blocks:
       if isinstance(b,str):
           n=n+1
       else:
           n=n+len(b)
-  #n=sum([len(b) for b in blocks])
-  r=Ring(n) 
-  declare_block_scheme(blocks,context)
+ 
+  r=Ring(n, names=canonicalize(blocks))
+
+  context["internalVariable"] = VariableFactory(r)
+#  context["Monomial"] = MonomialFactory(r)
   context["r"]=r
+  declare_block_scheme(blocks,context)
   return r
+
 def declare_block_scheme(blocks,context):
     start=0
     block_starts=[]
+    ring = context["r"]
     for b in blocks:
       if start!=0:
           block_starts.append(start)
       if isinstance(b,str):
-        context[b]=Variable(start)
-        set_variable_name(start,b)
+        context[b] = context["internalVariable"](start)
+        #_cpp_set_variable_name(ring, start, b)
         start=start+1
       else:
         b.register(start,context)
-        for (pos,name) in enumerate(b):
-            set_variable_name(start+pos,name)
-        
-        
+        #for (pos,name) in enumerate(b):
+        #    _cpp_set_variable_name(ring, start+pos, name)
         start=start+len(b)
     context["block_start_hints"]=block_starts
     context["number_of_declared_vars"]=start
@@ -346,7 +379,7 @@ def main():
   ablock=AlternatingBlock(["a","b","c"],100)
   declare_block_scheme([ablock],globals())
   for i in range(10):
-     print Variable(i)
+     print r.variable(i)
      
   print list(ablock)
   declare_block_scheme([
