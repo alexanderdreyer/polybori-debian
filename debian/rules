@@ -4,10 +4,11 @@
 
 PYVERS=$(shell pyversions -vr)
 
-stamp-build: $(PYVERS:%=stamp-build-python%)
+build-stamp: $(PYVERS:%=stamp-build-python%)
 	touch $@
-
-build: stamp-build
+build: build-arch build-indep
+build-arch: build-stamp
+build-indep: build-stamp
 
 stamp-build-python%: build-python%
 	touch $@
@@ -17,13 +18,23 @@ build-python%: PYTHON=/usr/bin/python$*
 build-python%: PYTHONSITE=`/usr/bin/python$* -c 'import setuptools; print setuptools.distutils.sysconfig.get_python_lib() '`
 
 build-python%:
-	scons prepare-install PYTHON=$(PYTHON)
-	-mkdir -p $(TMPDEST)
-	scons install devel-install INSTALLDIR=$(TMPDEST)/usr/lib/polybori \
+	scons prepare-install INSTALLDIR=$(TMPDEST)/usr/share/polybori \
 		PYINSTALLPREFIX=$(TMPDEST)$(PYTHONSITE) MANDIR=$(TMPDEST)/usr/share/man \
 		PREFIX=$(TMPDEST)/usr EPREFIX=$(TMPDEST)/usr/bin \
 		DOCDIR=$(TMPDEST)/usr/share/doc/polybori PYTHON=$(PYTHON) \
-		RELATIVEPYPREFIX=/usr/lib/python$*/site-packages
+		RELATIVEPYPREFIX=/usr/lib/python$*/site-packages \
+		LINKFLAGS="$(LDFLAGS)" CCFLAGS="$(CPPFLAGS)" \
+		CFLAGS="$(CFLAGS)" CXXFLAGS="$(CXXFLAGS)" \
+		LIBRARY_VERSION="1.0.0"
+	-mkdir -p $(TMPDEST)
+	scons install devel-install INSTALLDIR=$(TMPDEST)/usr/share/polybori \
+		PYINSTALLPREFIX=$(TMPDEST)$(PYTHONSITE) MANDIR=$(TMPDEST)/usr/share/man \
+		PREFIX=$(TMPDEST)/usr EPREFIX=$(TMPDEST)/usr/bin \
+		DOCDIR=$(TMPDEST)/usr/share/doc/polybori PYTHON=$(PYTHON) \
+		RELATIVEPYPREFIX=/usr/lib/python$*/site-packages \
+		LINKFLAGS="$(LDFLAGS)" CCFLAGS="$(CPPFLAGS)" \
+		CFLAGS="$(CFLAGS)" CXXFLAGS="$(CXXFLAGS)" \
+		LIBRARY_VERSION="1.0.0"
 
 install-%:
 	-mkdir debian/tmp/
@@ -32,9 +43,12 @@ install-%:
 install: $(PYVERS:%=install-%)
 	-mkdir -p debian/tmp/
 	-mkdir -p debian/tmp/usr/lib
+	-mkdir -p debian/tmp/usr/share
 
 clean:
 	$(MAKE) -C doc clean
+	rm -f doc/python/polybori.*.html
+	rm -f M4RI/config.log
 	rm -rf $(PYVERS:%=debian/python-polybori%)
 	scons . --keep-going --clean || true
 	dh_clean
@@ -46,7 +60,7 @@ clean:
 	rm -rf build
 
 # Build architecture-independent files here.
-binary-indep: stamp-build install
+binary-indep: build-stamp install
 	dh_testdir -i
 	dh_testroot -i
 	dh_installchangelogs -i
@@ -68,14 +82,14 @@ binary-indep: stamp-build install
 	dh_link -i
 	dh_compress -i
 	dh_fixperms -i
-	dh_pycentral -ppython-polybori
+	dh_python2 -ppython-polybori
 	dh_installdeb -i
 	dh_gencontrol -i
 	dh_md5sums -i
 	dh_builddeb -i
 
 # Build architecture-dependent files here.
-binary-arch: stamp-build install
+binary-arch: build-stamp install
 	dh_testdir -a
 	dh_testroot -a
 	dh_installchangelogs -a
@@ -100,7 +114,7 @@ binary-arch: stamp-build install
 	dh_link -a
 	dh_compress -a
 	dh_fixperms -a
-	dh_pycentral -ppython-polybori
+	dh_python2 -ppython-polybori
 	dh_makeshlibs -a
 	dh_installdeb -a
 	dh_shlibdeps -a

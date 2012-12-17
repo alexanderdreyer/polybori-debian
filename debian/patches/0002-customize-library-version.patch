@@ -1,0 +1,64 @@
+Description: make LIBRARY_VERSION customizable
+ TODO: Put a short summary on the line above and replace this paragraph
+ with a longer explanation of this change. Complete the meta-information
+ with other relevant fields (see below for details). To make it easier, the
+ information below has been extracted from the changelog. Adjust it or drop
+ it.
+ .
+ polybori (0.8.2-1) unstable; urgency=low
+ .
+   * Updating to recent Debian standards
+Author: Alexander Dreyer <adreyer@gmx.de>
+
+---
+The information above should follow the Patch Tagging Guidelines, please
+checkout http://dep.debian.net/deps/dep3/ to learn about the format. Here
+are templates for supplementary fields that you might want to add:
+
+Origin: upstream, https://bitbucket.org/brickenstein/polybori/commits/c250d7bae2f8a15bb83ff2ebfdc165c09dc36e13/raw/
+Bug: https://bitbucket.org/brickenstein/polybori/commits/c250d7bae2f8a15bb83ff2ebfdc165c09dc36e13/
+Forwarded: not-needed
+Last-Update: 2012-12-18
+--- polybori-0.8.2.orig/SConstruct
++++ polybori-0.8.2/SConstruct
+@@ -15,7 +15,6 @@ except:
+     pborirelease = "0"
+ 
+ 
+-libraryversion = "0.0.0"
+ debname = "polybori-" + pboriversion + '.' + pborirelease
+ 
+ import tarfile
+@@ -408,7 +407,7 @@ def setup_env(defaultenv):
+     opts.Add('SHLIBVERSIONSUFFIX',
+              'Shared libraries suffix for library versioning.',
+              '-' + pboriversion +'.' + pborirelease +
+-             defaultenv['SHLIBSUFFIX'] + '.' + libraryversion)
++             defaultenv['SHLIBSUFFIX'] + '.$LIBRARY_VERSION')
+ 
+ 
+ 
+@@ -432,6 +431,8 @@ def setup_env(defaultenv):
+             if var != "LIBSUFFIX":
+                 print "Variable", var, "not in default environment!"
+ 
++    opts.Add('LIBRARY_VERSION', "libtool-style library version", '0.0.0')
++
+     opts.Add('CONFFILE', "Dump settings to file, if given", '')
+ 
+     opts.Add('PLATFORM', "Manually set another platform (unusual)",
+@@ -926,12 +927,12 @@ def SymlinkReadableLibname(files):
+     result = []
+     import re
+     soPattern = re.compile('(.*)\.[0-9]*\.[0-9]*$', re.I|re.S)
+-    sonameversion = soPattern.findall(path.basename(libraryversion))[0]
++    sonameversion = soPattern.findall(path.basename(env.subst('$LIBRARY_VERSION')))[0]
+     
+     for fname in files:
+         fname = str(fname)
+         soname = soPattern.sub(r'\1', fname)
+-        versionname = fname.replace('.' + libraryversion, '')
++        versionname = fname.replace('.' + env.subst('$LIBRARY_VERSION'), '')
+         simple = fname.replace(suffix, simplesuffix)
+ 
+         for (dest, src) in [(soname, fname), (versionname, soname),
